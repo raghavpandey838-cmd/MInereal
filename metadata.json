@@ -1,0 +1,6 @@
+{
+  "name": "Minecraft Web Edition",
+  "description": "Authentic full-featured 3D voxel sandbox game featuring procedurally generated biomes, caves, survival & creative modes, mining, crafting, mobs, and day/night cycle.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
