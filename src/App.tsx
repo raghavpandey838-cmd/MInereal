@@ -130,9 +130,13 @@ export default function App() {
 
   // Check saved game in localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('mc_save_world');
-    if (saved) {
-      setSavedWorldAvailable(true);
+    try {
+      const saved = localStorage.getItem('mc_save_world');
+      if (saved) {
+        setSavedWorldAvailable(true);
+      }
+    } catch {
+      // Storage blocked or restricted
     }
   }, []);
 

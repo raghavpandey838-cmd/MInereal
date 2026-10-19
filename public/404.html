@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minecraft Web Edition</title>
+    <script>
+      // Single Page App redirect for GitHub Pages
+      sessionStorage.redirect = location.href;
+      var pathSegmentsToKeep = 1;
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body style="background:#111;color:#eee;font-family:sans-serif;text-align:center;padding-top:20vh;">
+    <h2>Loading Minecraft Web Edition...</h2>
+    <p><a href="./" style="color:#4ade80;">Click here to return to home</a></p>
+  </body>
+</html>

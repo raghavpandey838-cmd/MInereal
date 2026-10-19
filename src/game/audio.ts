@@ -11,17 +11,23 @@ class SoundEngine {
   private masterGain: GainNode | null = null;
   private musicInterval: number | null = null;
 
-  private initCtx() {
+  private initCtx(): boolean {
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.ctx = new AudioCtx();
-      this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.3;
-      this.masterGain.connect(this.ctx.destination);
+      try {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return false;
+        this.ctx = new AudioCtx();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.3;
+        this.masterGain.connect(this.ctx.destination);
+      } catch {
+        return false;
+      }
     }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
     }
+    return !!(this.ctx && this.masterGain);
   }
 
   public toggleMute(): boolean {
@@ -37,26 +43,32 @@ class SoundEngine {
   }
 
   // Generate white noise buffer
-  private createNoiseBuffer(duration: number): AudioBuffer {
-    this.initCtx();
-    const bufferSize = this.ctx!.sampleRate * duration;
-    const buffer = this.ctx!.createBuffer(1, bufferSize, this.ctx!.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
+  private createNoiseBuffer(duration: number): AudioBuffer | null {
+    if (!this.initCtx()) return null;
+    try {
+      const bufferSize = this.ctx!.sampleRate * duration;
+      const buffer = this.ctx!.createBuffer(1, bufferSize, this.ctx!.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      return buffer;
+    } catch {
+      return null;
     }
-    return buffer;
   }
 
   // Play walking footstep sound based on block walked on
   public playStep(block: BlockType) {
-    if (this.isMuted) return;
-    this.initCtx();
+    if (this.isMuted || !this.initCtx()) return;
     const ctx = this.ctx!;
     const now = ctx.currentTime;
 
+    const noiseBuffer = this.createNoiseBuffer(0.12);
+    if (!noiseBuffer) return;
+
     const noise = ctx.createBufferSource();
-    noise.buffer = this.createNoiseBuffer(0.12);
+    noise.buffer = noiseBuffer;
 
     const filter = ctx.createBiquadFilter();
     const gain = ctx.createGain();
@@ -458,8 +470,9 @@ class SoundEngine {
 
     const playAmbientChord = () => {
       if (this.isMuted) return;
-      this.initCtx();
-      const ctx = this.ctx!;
+      if (!this.initCtx()) return;
+      const ctx = this.ctx;
+      if (!ctx || !this.masterGain) return;
       const chords = [
         [261.63, 329.63, 392.0, 523.25], // C Major
         [220.0, 261.63, 329.63, 440.0],  // A Minor
