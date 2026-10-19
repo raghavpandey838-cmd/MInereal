@@ -30,6 +30,8 @@ interface GameHUDProps {
   isMuted: boolean;
   onToggleMute: () => void;
   onOpenInventory: () => void;
+  showMobileControls: boolean;
+  onToggleMobileControls: () => void;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -54,6 +56,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   isMuted,
   onToggleMute,
   onOpenInventory,
+  showMobileControls,
+  onToggleMobileControls,
 }) => {
   const hearts = [];
   const fullHearts = Math.floor(stats.health / 2);
@@ -133,6 +137,20 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           >
             {isMuted ? '🔇' : '🔊'}
           </button>
+
+          {/* Mobile On-Screen Controls Toggle */}
+          <button
+            onClick={() => {
+              sounds.playPop();
+              onToggleMobileControls();
+            }}
+            className={`mc-btn px-2.5 py-1 text-[11px] font-bold cursor-pointer transition-colors ${
+              showMobileControls ? 'bg-green-700/80 border-green-400 text-green-100' : 'bg-black/60 text-gray-300'
+            }`}
+            title="Toggle Mobile On-Screen Keys"
+          >
+            📱 {showMobileControls ? 'KEYS ON' : 'KEYS OFF'}
+          </button>
         </div>
 
         {/* Center: Active Vehicle Driving HUD or Click to Lock Banner */}
@@ -160,8 +178,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </button>
           </div>
         ) : !isLocked ? (
-          <div className="bg-yellow-500/90 text-black px-3 py-1 rounded font-bold text-xs shadow-lg pointer-events-none">
-            🖱️ Click screen to lock mouse & look · [ESC] to free mouse
+          <div className="bg-black/75 backdrop-blur-xs text-white px-3 py-1 rounded border border-white/20 font-bold text-xs shadow-lg pointer-events-none flex items-center gap-2">
+            <span className="text-yellow-400">📱 Mobile:</span>
+            <span>Use W A S D keys on screen & swipe to look</span>
+            <span className="text-white/40 hidden sm:inline">|</span>
+            <span className="text-gray-300 hidden sm:inline">Desktop: Click to lock mouse</span>
           </div>
         ) : null}
 
@@ -354,7 +375,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
 
         {/* 9-Slot Authentic Hotbar (Single-Click Responsive) */}
-        <div className="pointer-events-auto flex bg-[#8f8f8f] p-1 border-t-2 border-l-2 border-[#dbdbdb] border-r-2 border-b-2 border-[#2b2b2b] shadow-2xl rounded-xs">
+        <div className="pointer-events-auto flex bg-[#8f8f8f] p-1 border-t-2 border-l-2 border-[#dbdbdb] border-r-2 border-b-2 border-[#2b2b2b] shadow-2xl rounded-xs max-w-full overflow-x-auto">
           {hotbar.map((slot, index) => {
             const isSelected = selectedIndex === index;
             const iconUrl = slot ? getItemIcon(slot.id) : null;
@@ -365,14 +386,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   sounds.playPop();
                   onSelectSlot(index);
                 }}
-                className={`w-10 h-10 flex items-center justify-center relative cursor-pointer m-0.5 ${
+                className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center relative cursor-pointer m-0.5 shrink-0 ${
                   isSelected
                     ? 'border-2 border-white bg-[#a8a8a8] shadow-inner scale-105 z-10'
                     : 'border border-[#383838] bg-[#8b8b8b] hover:bg-[#9a9a9a]'
                 }`}
               >
                 {/* Slot number hint */}
-                <span className="absolute top-0.5 left-1 text-[9px] text-white/50 leading-none">
+                <span className="absolute top-0.5 left-1 text-[8px] sm:text-[9px] text-white/50 leading-none">
                   {index + 1}
                 </span>
 
@@ -381,13 +402,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   <img
                     src={iconUrl}
                     alt={slot?.id}
-                    className="w-7 h-7 object-contain pixelated pointer-events-none drop-shadow"
+                    className="w-5 h-5 sm:w-7 sm:h-7 object-contain pixelated pointer-events-none drop-shadow"
                   />
                 )}
 
                 {/* Count Badge */}
                 {slot && slot.count > 1 && (
-                  <span className="absolute bottom-0.5 right-1 text-xs font-bold text-white drop-shadow-[1px_1px_0px_#222]">
+                  <span className="absolute bottom-0.5 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow-[1px_1px_0px_#222]">
                     {slot.count}
                   </span>
                 )}
@@ -415,12 +436,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
 
         {/* Hotbar Hint & Quick Controls */}
-        <div className="text-[10px] text-white/80 mt-1 drop-shadow flex gap-3 font-mono">
-          <span className="text-yellow-300 font-bold">[W A S D] Move Everytime</span>
-          <span>[B] Build / Vehicles</span>
-          <span>[F] Fly Mode</span>
-          <span>[E] Mount/Bag</span>
-          <span>[Right-Click] Place</span>
+        <div className="text-[10px] text-white/80 mt-1 drop-shadow flex flex-wrap justify-center gap-2 font-mono px-2 text-center">
+          <span className="text-yellow-300 font-bold">W A S D Keys to Move</span>
+          <span>⛏️ Hold MINE</span>
+          <span>🧱 Tap PLACE</span>
+          <span>🕊️ Fly [F]</span>
+          <span>🎒 Bag [E]</span>
         </div>
       </div>
     </div>

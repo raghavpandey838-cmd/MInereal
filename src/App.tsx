@@ -32,6 +32,7 @@ import { BuildMenuModal } from './components/BuildMenuModal';
 import { PauseMenu } from './components/PauseMenu';
 import { DeathScreen } from './components/DeathScreen';
 import { F3DebugScreen } from './components/F3DebugScreen';
+import { MobileControls } from './components/MobileControls';
 
 type ModalType = 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'build';
 
@@ -46,6 +47,11 @@ interface HistoryStep {
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
 
+  // Touch look-around refs for mobile
+  const lookTouchId = useRef<number | null>(null);
+  const lastTouchX = useRef<number>(0);
+  const lastTouchY = useRef<number>(0);
+
   // Game UI States
   const [gameState, setGameState] = useState<'title' | 'playing' | 'paused' | 'dead'>('title');
   const [activeModal, setActiveModal] = useState<ModalType>('none');
@@ -56,6 +62,7 @@ export default function App() {
   const [hurtFlash, setHurtFlash] = useState<boolean>(false);
   const [fpsDisplay, setFpsDisplay] = useState<number>(60);
   const [savedWorldAvailable, setSavedWorldAvailable] = useState<boolean>(false);
+  const [showMobileControls, setShowMobileControls] = useState<boolean>(true);
 
   // Navigation, Flight & Vehicle States
   const [isFlying, setIsFlying] = useState<boolean>(false);
@@ -876,185 +883,204 @@ export default function App() {
     return () => cancelAnimationFrame(animId);
   }, [gameState, activeModal, gameMode, selectedHotbarIndex, applyPlayerDamage, inventory, isFlying]);
 
-  // Mouse Down: Mine Block or Attack Mob or Place Block
+  // Action: Start Mining block or attack mob (Shared between Mouse and Mobile button)
+  const handleMineStart = () => {
+    const engine = engineRef.current;
+    if (!engine || gameState !== 'playing' || activeModal !== 'none') return;
+
+    engine.hand.swing();
+    sounds.playSwing();
+    engine.isMining = true;
+
+    const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion);
+
+    // Check if hitting any mob first
+    for (let i = 0; i < engine.entities.mobs.length; i++) {
+      const mob = engine.entities.mobs[i];
+      const dist = Math.hypot(
+        engine.playerPos.x - mob.entity.x,
+        engine.playerPos.y - mob.entity.y,
+        engine.playerPos.z - mob.entity.z
+      );
+
+      if (dist < 4.5) {
+        const toMob = new THREE.Vector3(
+          mob.entity.x - engine.playerPos.x,
+          mob.entity.y + 0.8 - (engine.playerPos.y + 1.62),
+          mob.entity.z - engine.playerPos.z
+        ).normalize();
+
+        const dot = forwardDir.dot(toMob);
+        if (dot > 0.85) {
+          const held = inventory[selectedHotbarIndex];
+          const damage = (held && ITEM_ATTACK_DAMAGE[held.id]) || 2;
+          engine.entities.damageMob(i, damage, forwardDir);
+          engine.isMining = false;
+          return;
+        }
+      }
+    }
+  };
+
+  // Action: Stop Mining (Shared between Mouse and Mobile button)
+  const handleMineStop = () => {
+    if (engineRef.current) {
+      engineRef.current.isMining = false;
+      engineRef.current.miningProgress = 0;
+      engineRef.current.highlighter.setCrackStage(0, 0, 0, 0);
+    }
+  };
+
+  // Action: Place block, eat, interact with tables/chests/vehicles (Shared between Mouse and Mobile)
+  const handleInteract = () => {
+    const engine = engineRef.current;
+    if (!engine || gameState !== 'playing' || activeModal !== 'none') return;
+
+    engine.hand.swing();
+    sounds.playSwing();
+
+    // Check mounting vehicle with right click/tap if within 3.5 blocks
+    const mounted = engine.vehicles.toggleMountNearest(engine.playerPos);
+    if (mounted) {
+      setMountedVehicleState({ type: mounted.entity.type, speed: mounted.entity.speed });
+      return;
+    }
+
+    const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion);
+    const hit = engine.world.raycast(engine.camera.position, forwardDir, 5.5);
+
+    if (hit.hit) {
+      if (hit.block === BlockType.CRAFTING_TABLE) {
+        setActiveModal('crafting');
+        document.exitPointerLock?.();
+        return;
+      }
+      if (hit.block === BlockType.FURNACE) {
+        setActiveModal('furnace');
+        document.exitPointerLock?.();
+        return;
+      }
+      if (hit.block === BlockType.CHEST) {
+        setActiveModal('chest');
+        document.exitPointerLock?.();
+        return;
+      }
+      if (hit.block === BlockType.TNT) {
+        engine.world.setBlock(hit.x, hit.y, hit.z, BlockType.AIR);
+        engine.world.rebuildDirtyChunks();
+        sounds.playCreeperHiss();
+        setTimeout(() => {
+          engine.entities.explodeAt(engine.world, hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, 4.0);
+        }, 1800);
+        return;
+      }
+
+      const held = inventory[selectedHotbarIndex];
+      if (held && FOOD_RESTORE[held.id] && playerStats.hunger < 20) {
+        handleEatFood(held.id);
+        return;
+      }
+
+      const placeX = hit.x + hit.normal[0];
+      const placeY = hit.y + hit.normal[1];
+      const placeZ = hit.z + hit.normal[2];
+
+      const playerBox = {
+        minX: engine.playerPos.x - 0.3,
+        maxX: engine.playerPos.x + 0.3,
+        minY: engine.playerPos.y,
+        maxY: engine.playerPos.y + 1.8,
+        minZ: engine.playerPos.z - 0.3,
+        maxZ: engine.playerPos.z + 0.3,
+      };
+
+      const blockBox = {
+        minX: placeX,
+        maxX: placeX + 1,
+        minY: placeY,
+        maxY: placeY + 1,
+        minZ: placeZ,
+        maxZ: placeZ + 1,
+      };
+
+      const overlaps =
+        playerBox.minX < blockBox.maxX &&
+        playerBox.maxX > blockBox.minX &&
+        playerBox.minY < blockBox.maxY &&
+        playerBox.maxY > blockBox.minY &&
+        playerBox.minZ < blockBox.maxZ &&
+        playerBox.maxZ > blockBox.minZ;
+
+      if (overlaps) return;
+
+      let placeBlockType: BlockType | null = null;
+      if (held) {
+        const def = Object.values(BLOCK_DEFS).find((d) => d.id === held.id);
+        if (def && def.type !== BlockType.AIR) {
+          placeBlockType = def.type;
+        }
+      }
+
+      if (placeBlockType !== null) {
+        const oldType = engine.world.getBlock(placeX, placeY, placeZ);
+        engine.world.setBlock(placeX, placeY, placeZ, placeBlockType);
+        engine.world.rebuildDirtyChunks();
+        sounds.playBlockPlace();
+
+        setBuildHistory((prev) => [
+          ...prev.slice(-49),
+          [{ x: placeX, y: placeY, z: placeZ, oldType, newType: placeBlockType! }],
+        ]);
+
+        if (placeBlockType === BlockType.TORCH && engine.torchLights.length < 20) {
+          const torchLight = new THREE.PointLight(0xffaa44, 1.2, 12);
+          torchLight.position.set(placeX + 0.5, placeY + 0.8, placeZ + 0.5);
+          engine.scene.add(torchLight);
+          engine.torchLights.push(torchLight);
+        }
+
+        if (gameMode === 'survival') {
+          setInventory((prev) => {
+            const newInv = [...prev];
+            const slot = newInv[selectedHotbarIndex];
+            if (slot) {
+              if (slot.count > 1) {
+                newInv[selectedHotbarIndex] = { ...slot, count: slot.count - 1 };
+              } else {
+                newInv[selectedHotbarIndex] = null;
+              }
+            }
+            return newInv;
+          });
+        }
+      }
+    }
+  };
+
+  // Mouse Down Event
   const handleMouseDown = (e: React.MouseEvent) => {
     const engine = engineRef.current;
     if (!engine) return;
 
-    // Lock pointer on first click
+    // Lock pointer on first click if desktop
     if (document.pointerLockElement !== engine.renderer.domElement) {
-      engine.renderer.domElement.requestPointerLock();
+      engine.renderer.domElement.requestPointerLock?.();
       if (gameState === 'title') {
         setGameState('playing');
       }
       return;
     }
 
-    if (gameState !== 'playing' || activeModal !== 'none') return;
-
-    engine.hand.swing();
-    sounds.playSwing();
-
-    const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion);
-
     if (e.button === 0) {
-      // LEFT CLICK: Attack mob OR Mine block
-      engine.isMining = true;
-
-      // Check if hitting any mob first
-      for (let i = 0; i < engine.entities.mobs.length; i++) {
-        const mob = engine.entities.mobs[i];
-        const dist = Math.hypot(
-          engine.playerPos.x - mob.entity.x,
-          engine.playerPos.y - mob.entity.y,
-          engine.playerPos.z - mob.entity.z
-        );
-
-        if (dist < 4.5) {
-          const toMob = new THREE.Vector3(
-            mob.entity.x - engine.playerPos.x,
-            mob.entity.y + 0.8 - (engine.playerPos.y + 1.62),
-            mob.entity.z - engine.playerPos.z
-          ).normalize();
-
-          const dot = forwardDir.dot(toMob);
-          if (dot > 0.85) {
-            const held = inventory[selectedHotbarIndex];
-            const damage = (held && ITEM_ATTACK_DAMAGE[held.id]) || 2;
-            engine.entities.damageMob(i, damage, forwardDir);
-            engine.isMining = false;
-            return;
-          }
-        }
-      }
+      handleMineStart();
     } else if (e.button === 2) {
-      // RIGHT CLICK: Place block or interact
       e.preventDefault();
-
-      // Check mounting vehicle with right click if within 3 blocks
-      const mounted = engine.vehicles.toggleMountNearest(engine.playerPos);
-      if (mounted) {
-        setMountedVehicleState({ type: mounted.entity.type, speed: mounted.entity.speed });
-        return;
-      }
-
-      const hit = engine.world.raycast(engine.camera.position, forwardDir, 5.5);
-
-      if (hit.hit) {
-        if (hit.block === BlockType.CRAFTING_TABLE) {
-          setActiveModal('crafting');
-          document.exitPointerLock?.();
-          return;
-        }
-        if (hit.block === BlockType.FURNACE) {
-          setActiveModal('furnace');
-          document.exitPointerLock?.();
-          return;
-        }
-        if (hit.block === BlockType.CHEST) {
-          setActiveModal('chest');
-          document.exitPointerLock?.();
-          return;
-        }
-        if (hit.block === BlockType.TNT) {
-          engine.world.setBlock(hit.x, hit.y, hit.z, BlockType.AIR);
-          engine.world.rebuildDirtyChunks();
-          sounds.playCreeperHiss();
-          setTimeout(() => {
-            engine.entities.explodeAt(engine.world, hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, 4.0);
-          }, 1800);
-          return;
-        }
-
-        const held = inventory[selectedHotbarIndex];
-        if (held && FOOD_RESTORE[held.id] && playerStats.hunger < 20) {
-          handleEatFood(held.id);
-          return;
-        }
-
-        const placeX = hit.x + hit.normal[0];
-        const placeY = hit.y + hit.normal[1];
-        const placeZ = hit.z + hit.normal[2];
-
-        const playerBox = {
-          minX: engine.playerPos.x - 0.3,
-          maxX: engine.playerPos.x + 0.3,
-          minY: engine.playerPos.y,
-          maxY: engine.playerPos.y + 1.8,
-          minZ: engine.playerPos.z - 0.3,
-          maxZ: engine.playerPos.z + 0.3,
-        };
-
-        const blockBox = {
-          minX: placeX,
-          maxX: placeX + 1,
-          minY: placeY,
-          maxY: placeY + 1,
-          minZ: placeZ,
-          maxZ: placeZ + 1,
-        };
-
-        const overlaps =
-          playerBox.minX < blockBox.maxX &&
-          playerBox.maxX > blockBox.minX &&
-          playerBox.minY < blockBox.maxY &&
-          playerBox.maxY > blockBox.minY &&
-          playerBox.minZ < blockBox.maxZ &&
-          playerBox.maxZ > blockBox.minZ;
-
-        if (overlaps) return;
-
-        let placeBlockType: BlockType | null = null;
-        if (held) {
-          const def = Object.values(BLOCK_DEFS).find((d) => d.id === held.id);
-          if (def && def.type !== BlockType.AIR) {
-            placeBlockType = def.type;
-          }
-        }
-
-        if (placeBlockType !== null) {
-          const oldType = engine.world.getBlock(placeX, placeY, placeZ);
-          engine.world.setBlock(placeX, placeY, placeZ, placeBlockType);
-          engine.world.rebuildDirtyChunks();
-          sounds.playBlockPlace();
-
-          setBuildHistory((prev) => [
-            ...prev.slice(-49),
-            [{ x: placeX, y: placeY, z: placeZ, oldType, newType: placeBlockType! }],
-          ]);
-
-          if (placeBlockType === BlockType.TORCH && engine.torchLights.length < 20) {
-            const torchLight = new THREE.PointLight(0xffaa44, 1.2, 12);
-            torchLight.position.set(placeX + 0.5, placeY + 0.8, placeZ + 0.5);
-            engine.scene.add(torchLight);
-            engine.torchLights.push(torchLight);
-          }
-
-          if (gameMode === 'survival') {
-            setInventory((prev) => {
-              const newInv = [...prev];
-              const slot = newInv[selectedHotbarIndex];
-              if (slot) {
-                if (slot.count > 1) {
-                  newInv[selectedHotbarIndex] = { ...slot, count: slot.count - 1 };
-                } else {
-                  newInv[selectedHotbarIndex] = null;
-                }
-              }
-              return newInv;
-            });
-          }
-        }
-      }
+      handleInteract();
     }
   };
 
   const handleMouseUp = () => {
-    if (engineRef.current) {
-      engineRef.current.isMining = false;
-      engineRef.current.miningProgress = 0;
-      engineRef.current.highlighter.setCrackStage(0, 0, 0, 0);
-    }
+    handleMineStop();
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -1067,6 +1093,64 @@ export default function App() {
 
     const maxPitch = Math.PI / 2 - 0.05;
     engine.cameraPitch = Math.max(-maxPitch, Math.min(maxPitch, engine.cameraPitch));
+  };
+
+  // Mobile Touch Look & Navigation Handlers
+  const handleTouchSetKey = (key: string, code: string, pressed: boolean) => {
+    if (engineRef.current) {
+      engineRef.current.keys[key] = pressed;
+      engineRef.current.keys[code] = pressed;
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, [data-interactive], input, select, textarea')) {
+      return;
+    }
+    if (gameState !== 'playing' || activeModal !== 'none') return;
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (lookTouchId.current === null) {
+        lookTouchId.current = touch.identifier;
+        lastTouchX.current = touch.clientX;
+        lastTouchY.current = touch.clientY;
+        break;
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (lookTouchId.current === null || gameState !== 'playing' || activeModal !== 'none') return;
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === lookTouchId.current) {
+        const dx = touch.clientX - lastTouchX.current;
+        const dy = touch.clientY - lastTouchY.current;
+        lastTouchX.current = touch.clientX;
+        lastTouchY.current = touch.clientY;
+
+        if (engineRef.current) {
+          const sensitivity = 0.0035;
+          engineRef.current.cameraYaw -= dx * sensitivity;
+          engineRef.current.cameraPitch -= dy * sensitivity;
+          const maxPitch = Math.PI / 2 - 0.05;
+          engineRef.current.cameraPitch = Math.max(-maxPitch, Math.min(maxPitch, engineRef.current.cameraPitch));
+        }
+        break;
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === lookTouchId.current) {
+        lookTouchId.current = null;
+        break;
+      }
+    }
   };
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -1272,11 +1356,15 @@ export default function App() {
 
   return (
     <div
-      className="relative w-screen h-screen overflow-hidden bg-black select-none font-mono"
+      className="relative w-screen h-screen overflow-hidden bg-black select-none font-mono touch-none"
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseMove={handleMouseMove}
       onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* 3D WebGL Canvas Container */}
@@ -1329,8 +1417,43 @@ export default function App() {
             setActiveModal('inventory');
             document.exitPointerLock?.();
           }}
+          showMobileControls={showMobileControls}
+          onToggleMobileControls={() => setShowMobileControls((s) => !s)}
         />
       )}
+
+      {/* On-Screen Mobile Navigation Keys & Action Cluster */}
+      {(gameState === 'playing' || gameState === 'paused') &&
+        showMobileControls &&
+        activeModal === 'none' && (
+          <MobileControls
+            onSetKey={handleTouchSetKey}
+            onMineStart={handleMineStart}
+            onMineStop={handleMineStop}
+            onInteract={handleInteract}
+            onRotateCamera={handleRotateCamera}
+            isFlying={isFlying}
+            onToggleFly={() => setIsFlying((f) => !f)}
+            isMounted={!!mountedVehicleState}
+            onDismount={() => {
+              if (engineRef.current) {
+                engineRef.current.vehicles.toggleMountNearest(engineRef.current.playerPos);
+                setMountedVehicleState(null);
+              }
+            }}
+            onOpenInventory={() => {
+              setActiveModal('inventory');
+              document.exitPointerLock?.();
+            }}
+            onOpenBuildMenu={() => {
+              setActiveModal('build');
+              document.exitPointerLock?.();
+            }}
+            canUndo={buildHistory.length > 0}
+            onUndo={handleUndo}
+            onTeleportHome={handleTeleportHome}
+          />
+        )}
 
       {/* F3 Debug Screen */}
       {showF3 && engineRef.current && (
