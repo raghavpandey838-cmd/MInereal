@@ -4,28 +4,25 @@
  */
 
 import React from 'react';
-import { GameMode } from '../game/types';
 import { sounds } from '../game/audio';
 
 interface PauseMenuProps {
   isOpen: boolean;
   onResume: () => void;
-  gameMode: GameMode;
-  onToggleGameMode: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
   onSaveWorld: () => void;
+  onOpenAdvancements: () => void;
   onQuitToTitle: () => void;
 }
 
 export const PauseMenu: React.FC<PauseMenuProps> = ({
   isOpen,
   onResume,
-  gameMode,
-  onToggleGameMode,
   isMuted,
   onToggleMute,
   onSaveWorld,
+  onOpenAdvancements,
   onQuitToTitle,
 }) => {
   if (!isOpen) return null;
@@ -40,18 +37,27 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
         {/* Back to Game */}
         <button
           onClick={onResume}
-          className="mc-btn w-full py-2.5 font-bold text-sm cursor-pointer shadow-lg"
+          className="mc-btn w-full py-2.5 font-bold text-sm cursor-pointer shadow-lg bg-[#3b6ea5]"
         >
           Back to Game
         </button>
 
-        {/* Game Mode Toggle */}
+        {/* Advancements Button */}
         <button
-          onClick={onToggleGameMode}
-          className="mc-btn w-full py-2 font-bold text-sm cursor-pointer"
+          onClick={() => {
+            sounds.playPop();
+            onOpenAdvancements();
+          }}
+          className="mc-btn w-full py-2 font-bold text-sm cursor-pointer text-yellow-300 flex items-center justify-center gap-1.5"
         >
-          Mode: <span className="text-yellow-300 uppercase">{gameMode}</span>
+          <span>🏆</span>
+          <span>View Advancements & Trophies</span>
         </button>
+
+        {/* Mode Indicator */}
+        <div className="w-full py-2 font-bold text-xs bg-black/60 rounded border border-white/20 text-yellow-400">
+          Mode: <span className="text-white uppercase font-mono">Creative (Master Builder)</span>
+        </div>
 
         {/* Audio Mute Toggle */}
         <button
@@ -69,7 +75,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
           }}
           className="mc-btn w-full py-2 font-bold text-sm cursor-pointer"
         >
-          Save World
+          Save World to Storage
         </button>
 
         {/* Quit to Title */}
@@ -81,7 +87,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
         </button>
 
         <div className="mt-4 text-xs text-white/50">
-          Minecraft Web Edition · 3D Three.js
+          Minecraft Creative Edition · 3D Three.js
         </div>
       </div>
     </div>

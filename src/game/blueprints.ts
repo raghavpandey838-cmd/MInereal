@@ -445,6 +445,263 @@ export const STRUCTURES: StructureTemplate[] = [
       return blocks;
     },
   },
+  {
+    id: 'royal_castle',
+    name: 'Royal Medieval Fortress',
+    description: 'Grand 11x11 stone fortress with 4 defensive corner towers, gatehouse, battlements & inner courtyard.',
+    icon: '🏰',
+    width: 11,
+    height: 9,
+    depth: 11,
+    generate: () => {
+      const blocks: StructureBlock[] = [];
+      const size = 11;
+      const wallH = 5;
+      const towerH = 8;
+
+      // 1. Cobblestone Courtyard Floor
+      for (let x = 0; x < size; x++) {
+        for (let z = 0; z < size; z++) {
+          blocks.push({ dx: x, dy: 0, dz: z, type: BlockType.COBBLESTONE });
+        }
+      }
+
+      // 2. Outer Curtain Walls
+      for (let y = 1; y <= wallH; y++) {
+        for (let x = 0; x < size; x++) {
+          for (let z = 0; z < size; z++) {
+            const isOuter = x === 0 || x === size - 1 || z === 0 || z === size - 1;
+            const isGate = (x === 4 || x === 5 || x === 6) && z === 0 && (y === 1 || y === 2 || y === 3);
+            if (isGate) continue;
+            if (isOuter) {
+              blocks.push({ dx: x, dy: y, dz: z, type: BlockType.BRICKS });
+            }
+          }
+        }
+      }
+
+      // 3. Four Corner Defensive Towers (3x3 at each corner)
+      const corners = [
+        { cx: 0, cz: 0 },
+        { cx: size - 3, cz: 0 },
+        { cx: 0, cz: size - 3 },
+        { cx: size - 3, cz: size - 3 },
+      ];
+
+      for (const { cx, cz } of corners) {
+        for (let y = 1; y <= towerH; y++) {
+          for (let dx = 0; dx < 3; dx++) {
+            for (let dz = 0; dz < 3; dz++) {
+              const isTowerWall = dx === 0 || dx === 2 || dz === 0 || dz === 2;
+              if (isTowerWall || y === towerH) {
+                blocks.push({ dx: cx + dx, dy: y, dz: cz + dz, type: BlockType.COBBLESTONE });
+              }
+            }
+          }
+        }
+        // Tower parapets and torch
+        for (let dx = 0; dx < 3; dx++) {
+          for (let dz = 0; dz < 3; dz++) {
+            if ((dx + dz) % 2 === 0) {
+              blocks.push({ dx: cx + dx, dy: towerH + 1, dz: cz + dz, type: BlockType.BRICKS });
+            }
+          }
+        }
+        blocks.push({ dx: cx + 1, dy: towerH + 1, dz: cz + 1, type: BlockType.TORCH });
+      }
+
+      // 4. Center Royal Throne / Monument in Courtyard
+      blocks.push({ dx: 5, dy: 1, dz: 5, type: BlockType.GOLD_ORE });
+      blocks.push({ dx: 5, dy: 2, dz: 5, type: BlockType.TORCH });
+      blocks.push({ dx: 4, dy: 1, dz: 5, type: BlockType.OAK_PLANKS });
+      blocks.push({ dx: 6, dy: 1, dz: 5, type: BlockType.OAK_PLANKS });
+      blocks.push({ dx: 5, dy: 1, dz: 7, type: BlockType.CHEST });
+
+      return blocks;
+    },
+  },
+  {
+    id: 'modern_villa',
+    name: 'Modern Glass Villa & Pool',
+    description: 'Sleek 9x9 contemporary mansion with floor-to-ceiling glass panoramic walls, wood decking & pool.',
+    icon: '🏡',
+    width: 9,
+    height: 6,
+    depth: 9,
+    generate: () => {
+      const blocks: StructureBlock[] = [];
+      const size = 9;
+
+      // 1. Foundation: Smooth stone with oak wood patio
+      for (let x = 0; x < size; x++) {
+        for (let z = 0; z < size; z++) {
+          if (x >= 6 && z >= 2 && z <= 6) {
+            // Outdoor pool
+            blocks.push({ dx: x, dy: 0, dz: z, type: BlockType.WATER });
+          } else {
+            blocks.push({ dx: x, dy: 0, dz: z, type: BlockType.OAK_PLANKS });
+          }
+        }
+      }
+
+      // 2. Villa Structure (x: 0..5, z: 0..8)
+      for (let y = 1; y <= 4; y++) {
+        for (let x = 0; x <= 5; x++) {
+          for (let z = 0; z <= 8; z++) {
+            const isExterior = x === 0 || x === 5 || z === 0 || z === 8;
+            const isEntrance = x === 2 && z === 0 && (y === 1 || y === 2);
+            if (isEntrance) continue;
+
+            if (isExterior) {
+              const isGlassWall = (y === 2 || y === 3) && (z === 4 || z === 5 || x === 5 || x === 0);
+              blocks.push({
+                dx: x,
+                dy: y,
+                dz: z,
+                type: isGlassWall ? BlockType.GLASS : BlockType.SNOW,
+              });
+            } else {
+              blocks.push({ dx: x, dy: y, dz: z, type: BlockType.AIR });
+            }
+          }
+        }
+      }
+
+      // 3. Flat Modern Roof with Overhang
+      for (let x = -1; x <= 6; x++) {
+        for (let z = -1; z <= 9; z++) {
+          blocks.push({ dx: x, dy: 5, dz: z, type: BlockType.SNOW });
+        }
+      }
+
+      // 4. Interior Luxury Furnishings
+      blocks.push({ dx: 1, dy: 1, dz: 7, type: BlockType.BOOKSHELF });
+      blocks.push({ dx: 1, dy: 2, dz: 7, type: BlockType.BOOKSHELF });
+      blocks.push({ dx: 2, dy: 1, dz: 7, type: BlockType.CHEST });
+      blocks.push({ dx: 4, dy: 1, dz: 1, type: BlockType.CRAFTING_TABLE });
+      blocks.push({ dx: 4, dy: 1, dz: 2, type: BlockType.FURNACE });
+      blocks.push({ dx: 2, dy: 3, dz: 4, type: BlockType.TORCH });
+
+      return blocks;
+    },
+  },
+  {
+    id: 'pagoda_temple',
+    name: 'Japanese Pagoda Shrine',
+    description: 'Traditional 7x7 multi-tiered Asian pagoda with flared roofs, wooden pillars & meditation sanctuary.',
+    icon: '⛩️',
+    width: 7,
+    height: 11,
+    depth: 7,
+    generate: () => {
+      const blocks: StructureBlock[] = [];
+      const size = 7;
+
+      // Base stone platform
+      for (let x = 0; x < size; x++) {
+        for (let z = 0; z < size; z++) {
+          blocks.push({ dx: x, dy: 0, dz: z, type: BlockType.COBBLESTONE });
+        }
+      }
+
+      // Tier 1: Oak logs and red brick walls
+      for (let y = 1; y <= 4; y++) {
+        for (let x = 1; x <= 5; x++) {
+          for (let z = 1; z <= 5; z++) {
+            const isCorner = (x === 1 || x === 5) && (z === 1 || z === 5);
+            const isBorder = x === 1 || x === 5 || z === 1 || z === 5;
+            const isDoor = x === 3 && z === 1 && (y === 1 || y === 2);
+            if (isDoor) continue;
+            if (isCorner) {
+              blocks.push({ dx: x, dy: y, dz: z, type: BlockType.OAK_LOG });
+            } else if (isBorder) {
+              blocks.push({ dx: x, dy: y, dz: z, type: BlockType.BRICKS });
+            }
+          }
+        }
+      }
+
+      // Tier 1 Flared Eaves Roof
+      for (let x = 0; x < size; x++) {
+        for (let z = 0; z < size; z++) {
+          blocks.push({ dx: x, dy: 5, dz: z, type: BlockType.NETHERRACK });
+        }
+      }
+
+      // Tier 2: Smaller upper sanctum
+      for (let y = 6; y <= 8; y++) {
+        for (let x = 2; x <= 4; x++) {
+          for (let z = 2; z <= 4; z++) {
+            const isBorder = x === 2 || x === 4 || z === 2 || z === 4;
+            if (isBorder) {
+              blocks.push({ dx: x, dy: y, dz: z, type: BlockType.OAK_PLANKS });
+            }
+          }
+        }
+      }
+
+      // Top Peak Roof & Spire
+      for (let x = 1; x <= 5; x++) {
+        for (let z = 1; z <= 5; z++) {
+          blocks.push({ dx: x, dy: 9, dz: z, type: BlockType.NETHERRACK });
+        }
+      }
+      blocks.push({ dx: 3, dy: 10, dz: 3, type: BlockType.GOLD_ORE });
+      blocks.push({ dx: 3, dy: 11, dz: 3, type: BlockType.TORCH });
+
+      return blocks;
+    },
+  },
+  {
+    id: 'sky_island',
+    name: 'Floating Sky Island',
+    description: 'Floating celestial biome with ancient stone base, lush grass plateau, oak tree & gold ore.',
+    icon: '🛸',
+    width: 9,
+    height: 9,
+    depth: 9,
+    generate: () => {
+      const blocks: StructureBlock[] = [];
+      const radius = 4;
+      const centerY = 3;
+
+      // Inverted cone / organic floating island base
+      for (let dy = -3; dy <= 0; dy++) {
+        const curR = radius + dy * 0.8;
+        for (let dx = -radius; dx <= radius; dx++) {
+          for (let dz = -radius; dz <= radius; dz++) {
+            if (dx * dx + dz * dz <= curR * curR) {
+              const block = dy === 0 ? BlockType.GRASS : dy === -1 ? BlockType.DIRT : BlockType.STONE;
+              blocks.push({ dx: 4 + dx, dy: centerY + dy, dz: 4 + dz, type: block });
+            }
+          }
+        }
+      }
+
+      // Center Oak Tree on top of island
+      for (let ty = 1; ty <= 4; ty++) {
+        blocks.push({ dx: 4, dy: centerY + ty, dz: 4, type: BlockType.OAK_LOG });
+      }
+      // Tree Leaves
+      for (let lx = -2; lx <= 2; lx++) {
+        for (let lz = -2; lz <= 2; lz++) {
+          for (let ly = 3; ly <= 5; ly++) {
+            if (Math.abs(lx) + Math.abs(lz) <= 3) {
+              blocks.push({ dx: 4 + lx, dy: centerY + ly, dz: 4 + lz, type: BlockType.OAK_LEAVES });
+            }
+          }
+        }
+      }
+
+      // Treasure on island
+      blocks.push({ dx: 3, dy: centerY + 1, dz: 3, type: BlockType.CHEST });
+      blocks.push({ dx: 5, dy: centerY + 1, dz: 5, type: BlockType.TORCH });
+      blocks.push({ dx: 2, dy: centerY + 1, dz: 4, type: BlockType.POPPY });
+      blocks.push({ dx: 6, dy: centerY + 1, dz: 3, type: BlockType.DANDELION });
+
+      return blocks;
+    },
+  },
 ];
 
 // Spawns a structure into the world with history recorded for undo

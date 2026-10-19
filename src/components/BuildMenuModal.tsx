@@ -9,16 +9,25 @@ import { getItemIcon } from '../game/textures';
 import { STRUCTURES, StructureTemplate } from '../game/blueprints';
 import { sounds } from '../game/audio';
 
+export type CreativeToolType =
+  | 'wall3x3'
+  | 'floor5x5'
+  | 'column4'
+  | 'sphereDome'
+  | 'highway'
+  | 'demolish'
+  | 'tntCluster';
+
 interface BuildMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectStructure: (template: StructureTemplate) => void;
-  onSelectTool: (toolType: 'wall3x3' | 'floor5x5' | 'column4') => void;
+  onSelectTool: (toolType: CreativeToolType) => void;
   onSelectCreativeItem: (itemId: ItemId) => void;
   onSpawnDriveableVehicle: (type: 'car' | 'bike' | 'boat') => void;
+  onSpawnMob: (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper') => void;
   canUndo: boolean;
   onUndo: () => void;
-  currentMode: 'survival' | 'creative';
 }
 
 const CREATIVE_CATEGORIES: {
@@ -87,6 +96,20 @@ const CREATIVE_CATEGORIES: {
   },
 ];
 
+const MOBS_DATA: {
+  type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper';
+  name: string;
+  desc: string;
+  icon: string;
+}[] = [
+  { type: 'pig', name: 'Friendly Pig', desc: 'Pink farm animal that wanders and oinks happily.', icon: '🐷' },
+  { type: 'cow', name: 'Dairy Cow', desc: 'Classic black and white cow grazing on grass.', icon: '🐮' },
+  { type: 'sheep', name: 'Fluffy Sheep', desc: 'White wool sheep roaming the green fields.', icon: '🐑' },
+  { type: 'zombie', name: 'Night Zombie', desc: 'Undead mob roaming around. (Harmless in Creative!)', icon: '🧟' },
+  { type: 'skeleton', name: 'Skeleton Archer', desc: 'Ancient bone warrior.', icon: '💀' },
+  { type: 'creeper', name: 'Voxel Creeper', desc: 'Iconic green creature with ticking fuse.', icon: '💥' },
+];
+
 export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
   isOpen,
   onClose,
@@ -94,25 +117,31 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
   onSelectTool,
   onSelectCreativeItem,
   onSpawnDriveableVehicle,
+  onSpawnMob,
   canUndo,
   onUndo,
 }) => {
-  const [activeTab, setActiveTab] = useState<'blueprints' | 'vehicles' | 'multitools' | 'creative_palette'>('blueprints');
+  const [activeTab, setActiveTab] = useState<'blueprints' | 'vehicles' | 'multitools' | 'mobs' | 'creative_palette'>('blueprints');
   const [activeCatIndex, setActiveCatIndex] = useState<number>(0);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center pointer-events-auto select-none p-3">
-      <div className="mc-panel p-5 rounded text-[#3f3f3f] w-[640px] max-w-[96vw] relative flex flex-col max-h-[88vh] shadow-2xl">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center pointer-events-auto select-none p-3">
+      <div className="mc-panel p-5 rounded text-[#222] w-[680px] max-w-[96vw] relative flex flex-col max-h-[88vh] shadow-2xl">
         {/* Header */}
         <div className="flex justify-between items-center mb-3 border-b-2 border-[#888] pb-2">
           <div className="flex items-center gap-2">
             <span className="text-3xl">⚒️</span>
             <div>
-              <h2 className="font-bold text-lg text-[#111] leading-tight">Master Builder & Vehicles Menu</h2>
+              <h2 className="font-bold text-lg text-[#111] leading-tight flex items-center gap-2">
+                Creative Master Builder Studio
+                <span className="text-[10px] bg-yellow-500 text-black px-2 py-0.5 rounded font-mono font-bold">
+                  CREATIVE ONLY
+                </span>
+              </h2>
               <span className="text-[11px] text-[#555]">
-                Single-click construction: Blueprints, Driveable Vehicles, Multi-Block Tools & Infinite Palette
+                Instant Blueprints, Driveable Vehicles, WorldEdit Supertools, Mob Spawner & Infinite Palette
               </span>
             </div>
           </div>
@@ -129,7 +158,7 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
 
         {/* Top Navigation Tabs & Undo */}
         <div className="flex justify-between items-center mb-3 gap-1 overflow-x-auto pb-1">
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 flex-wrap">
             <button
               onClick={() => {
                 sounds.playPop();
@@ -141,7 +170,7 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
                   : 'mc-btn'
               }`}
             >
-              🏛️ Blueprints
+              🏛️ Blueprints ({STRUCTURES.length})
             </button>
             <button
               onClick={() => {
@@ -163,11 +192,24 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
               }}
               className={`px-3 py-1.5 text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap ${
                 activeTab === 'multitools'
-                  ? 'bg-[#3b6ea5] text-white border-2 border-[#1c3a5e]'
+                  ? 'bg-[#8b5cf6] text-white border-2 border-[#5b21b6]'
                   : 'mc-btn'
               }`}
             >
-              🧱 Multi-Block
+              🔮 Super Tools
+            </button>
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveTab('mobs');
+              }}
+              className={`px-3 py-1.5 text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap ${
+                activeTab === 'mobs'
+                  ? 'bg-[#10b981] text-white border-2 border-[#047857]'
+                  : 'mc-btn'
+              }`}
+            >
+              🐮 Spawn Mobs
             </button>
             <button
               onClick={() => {
@@ -191,7 +233,7 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
               onUndo();
             }}
             disabled={!canUndo}
-            className="mc-btn px-2.5 py-1 text-xs font-bold flex items-center gap-1 disabled:opacity-40 whitespace-nowrap"
+            className="mc-btn px-2.5 py-1 text-xs font-bold flex items-center gap-1 disabled:opacity-40 whitespace-nowrap shrink-0"
             title="Undo last placed structure or multi-block (Key: Z)"
           >
             <span>↩</span> Undo [Z]
@@ -202,17 +244,17 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
         {activeTab === 'blueprints' && (
           <div className="overflow-y-auto pr-1 flex-1 space-y-2.5">
             <div className="bg-[#b0b0b0] p-2 rounded text-xs text-[#222] border border-[#888]">
-              💡 <strong>Single Click Instant Build:</strong> Click <strong>"Build Now"</strong> on any blueprint to place it right in front of you instantly!
+              💡 <strong>Instant 1-Click Construction:</strong> Choose any structure below to generate it instantly in front of you! Includes castle fortresses, luxury glass villas, shrines, sky islands & ships.
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {STRUCTURES.map((struct) => (
                 <div
                   key={struct.id}
-                  className="bg-[#c2c2c2] border-2 border-[#888] hover:border-[#3b6ea5] p-3 rounded flex flex-col justify-between transition-all"
+                  className="bg-[#c2c2c2] border-2 border-[#888] hover:border-[#3b6ea5] p-3 rounded flex flex-col justify-between transition-all shadow-xs"
                 >
                   <div className="flex items-start gap-2.5 mb-2">
-                    <span className="text-3xl p-1 bg-white/50 rounded border border-[#999]">
+                    <span className="text-3xl p-1 bg-white/60 rounded border border-[#999] shrink-0">
                       {struct.icon}
                     </span>
                     <div className="flex-1">
@@ -241,11 +283,11 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
           </div>
         )}
 
-        {/* TAB 2: DRIVEABLE VEHICLES (Car, Bike, Boat) */}
+        {/* TAB 2: DRIVEABLE VEHICLES */}
         {activeTab === 'vehicles' && (
           <div className="overflow-y-auto pr-1 flex-1 space-y-3">
             <div className="bg-[#fff9db] border-2 border-[#eab308] p-2.5 rounded text-xs text-[#854d0e]">
-              🚀 <strong>Driveable Vehicles:</strong> Spawn functional vehicles right at your location! Walk up to them and press <strong>[E]</strong> or click <strong>Drive</strong> to mount. Drive using <strong>WASD</strong> keys!
+              🚀 <strong>Driveable Vehicles:</strong> Spawn functional vehicles right at your location! Walk up to them and press <strong>[E]</strong> or click <strong>Drive</strong> to mount. Steer using <strong>WASD</strong> keys!
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -306,72 +348,157 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
           </div>
         )}
 
-        {/* TAB 3: MULTI-BLOCK TOOLS */}
+        {/* TAB 3: CREATIVE SUPER TOOLS & WORLDEDIT */}
         {activeTab === 'multitools' && (
           <div className="overflow-y-auto pr-1 flex-1 space-y-3">
-            <div className="bg-[#b0b0b0] p-2 rounded text-xs text-[#222] border border-[#888]">
-              ⚡ <strong>Rapid Multi-Block Construction:</strong> Places 3x3 walls, 5x5 platforms, and 4-block pillars in 1 single click using your currently equipped block!
+            <div className="bg-[#f3e8ff] border-2 border-[#9333ea] p-2.5 rounded text-xs text-[#581c87]">
+              🔮 <strong>Creative WorldEdit Supertools:</strong> Advanced instant terraforming powers! Generate glass biodomes, 12-block paved highways, demolish terrain, or lay down multi-block platforms.
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              {/* Wall Tool */}
-              <div className="bg-[#c2c2c2] border-2 border-[#888] p-3 rounded flex flex-col items-center text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {/* Glass Dome */}
+              <div className="bg-[#c2c2c2] border-2 border-[#888] p-2.5 rounded flex flex-col items-center text-center">
+                <span className="text-3xl mb-1">🔮</span>
+                <h3 className="font-bold text-xs mb-1">Glass Biodome</h3>
+                <p className="text-[10px] text-[#555] mb-2 flex-1">
+                  Generates an expansive 7x7 spherical glass greenhouse dome.
+                </p>
+                <button
+                  onClick={() => {
+                    onSelectTool('sphereDome');
+                    onClose();
+                  }}
+                  className="mc-btn w-full py-1 text-xs font-bold text-purple-200"
+                >
+                  Create Dome
+                </button>
+              </div>
+
+              {/* Highway Road */}
+              <div className="bg-[#c2c2c2] border-2 border-[#888] p-2.5 rounded flex flex-col items-center text-center">
+                <span className="text-3xl mb-1">🛣️</span>
+                <h3 className="font-bold text-xs mb-1">Highway Road</h3>
+                <p className="text-[10px] text-[#555] mb-2 flex-1">
+                  Lays a 3-wide smooth stone roadway stretching 12 blocks ahead.
+                </p>
+                <button
+                  onClick={() => {
+                    onSelectTool('highway');
+                    onClose();
+                  }}
+                  className="mc-btn w-full py-1 text-xs font-bold"
+                >
+                  Pave Road
+                </button>
+              </div>
+
+              {/* Demolish Brush */}
+              <div className="bg-[#c2c2c2] border-2 border-[#888] p-2.5 rounded flex flex-col items-center text-center">
+                <span className="text-3xl mb-1">🧹</span>
+                <h3 className="font-bold text-xs mb-1">Demolish Brush</h3>
+                <p className="text-[10px] text-[#555] mb-2 flex-1">
+                  Instantly clears out a 5x5x5 cubic area in front of you.
+                </p>
+                <button
+                  onClick={() => {
+                    onSelectTool('demolish');
+                    onClose();
+                  }}
+                  className="mc-btn w-full py-1 text-xs font-bold text-red-200"
+                >
+                  Clear Area
+                </button>
+              </div>
+
+              {/* TNT Cluster */}
+              <div className="bg-[#c2c2c2] border-2 border-[#888] p-2.5 rounded flex flex-col items-center text-center">
+                <span className="text-3xl mb-1">💥</span>
+                <h3 className="font-bold text-xs mb-1">TNT Mega Cluster</h3>
+                <p className="text-[10px] text-[#555] mb-2 flex-1">
+                  Places a 3x3 array of TNT blocks ready for pyrotechnic blasting.
+                </p>
+                <button
+                  onClick={() => {
+                    onSelectTool('tntCluster');
+                    onClose();
+                  }}
+                  className="mc-btn w-full py-1 text-xs font-bold text-orange-200"
+                >
+                  Place TNT
+                </button>
+              </div>
+
+              {/* 3x3 Wall */}
+              <div className="bg-[#c2c2c2] border-2 border-[#888] p-2.5 rounded flex flex-col items-center text-center">
                 <span className="text-3xl mb-1">🧱</span>
                 <h3 className="font-bold text-xs mb-1">3x3 Wall</h3>
-                <p className="text-[10px] text-[#555] mb-3">
-                  Places a 3-wide by 3-high wall in front of you.
+                <p className="text-[10px] text-[#555] mb-2 flex-1">
+                  Builds a 3x3 upright wall using your currently equipped block.
                 </p>
                 <button
                   onClick={() => {
                     onSelectTool('wall3x3');
                     onClose();
                   }}
-                  className="mc-btn w-full py-1.5 text-xs font-bold"
+                  className="mc-btn w-full py-1 text-xs font-bold"
                 >
                   Place Wall
                 </button>
               </div>
 
-              {/* Floor Tool */}
-              <div className="bg-[#c2c2c2] border-2 border-[#888] p-3 rounded flex flex-col items-center text-center">
+              {/* 5x5 Platform */}
+              <div className="bg-[#c2c2c2] border-2 border-[#888] p-2.5 rounded flex flex-col items-center text-center">
                 <span className="text-3xl mb-1">🟩</span>
                 <h3 className="font-bold text-xs mb-1">5x5 Platform</h3>
-                <p className="text-[10px] text-[#555] mb-3">
-                  Places a 5x5 ground platform directly beneath you.
+                <p className="text-[10px] text-[#555] mb-2 flex-1">
+                  Instantly creates a 5x5 ground floor platform directly beneath you.
                 </p>
                 <button
                   onClick={() => {
                     onSelectTool('floor5x5');
                     onClose();
                   }}
-                  className="mc-btn w-full py-1.5 text-xs font-bold"
+                  className="mc-btn w-full py-1 text-xs font-bold"
                 >
-                  Place Platform
-                </button>
-              </div>
-
-              {/* Column Tool */}
-              <div className="bg-[#c2c2c2] border-2 border-[#888] p-3 rounded flex flex-col items-center text-center">
-                <span className="text-3xl mb-1">🏛️</span>
-                <h3 className="font-bold text-xs mb-1">4-Block Pillar</h3>
-                <p className="text-[10px] text-[#555] mb-3">
-                  Builds a 4-block vertical column to reach higher areas.
-                </p>
-                <button
-                  onClick={() => {
-                    onSelectTool('column4');
-                    onClose();
-                  }}
-                  className="mc-btn w-full py-1.5 text-xs font-bold"
-                >
-                  Place Pillar
+                  Place Floor
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 4: CREATIVE BLOCK PALETTE */}
+        {/* TAB 4: MOB SPAWNER */}
+        {activeTab === 'mobs' && (
+          <div className="overflow-y-auto pr-1 flex-1 space-y-3">
+            <div className="bg-[#ecfdf5] border-2 border-[#10b981] p-2.5 rounded text-xs text-[#065f46]">
+              🐮 <strong>Creative Mob Spawner:</strong> Bring your voxel realm to life! 1-click to spawn animals, pets, or creatures right near you.
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {MOBS_DATA.map((mob) => (
+                <div
+                  key={mob.type}
+                  className="bg-[#c2c2c2] border-2 border-[#888] hover:border-green-600 p-3 rounded flex flex-col items-center text-center"
+                >
+                  <span className="text-4xl mb-1">{mob.icon}</span>
+                  <h3 className="font-bold text-xs mb-1 text-[#111]">{mob.name}</h3>
+                  <p className="text-[10px] text-[#555] mb-3 flex-1">{mob.desc}</p>
+                  <button
+                    onClick={() => {
+                      onSpawnMob(mob.type);
+                      onClose();
+                    }}
+                    className="mc-btn w-full py-1.5 text-xs font-bold text-green-100 hover:text-white"
+                  >
+                    Spawn {mob.type.toUpperCase()}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: CREATIVE BLOCK PALETTE */}
         {activeTab === 'creative_palette' && (
           <div className="flex flex-col flex-1 overflow-hidden">
             <div className="flex gap-1 mb-2 border-b border-[#999] pb-1 overflow-x-auto">
@@ -427,7 +554,7 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
             Shortcut: <kbd className="px-1 bg-white border border-[#888] rounded">B</kbd> Build Menu
           </span>
           <span>
-            Mount/Dismount: <kbd className="px-1 bg-white border border-[#888] rounded">E</kbd>
+            Mount Vehicle: <kbd className="px-1 bg-white border border-[#888] rounded">E</kbd>
           </span>
           <span>
             Drive: <kbd className="px-1 bg-white border border-[#888] rounded">W A S D</kbd>

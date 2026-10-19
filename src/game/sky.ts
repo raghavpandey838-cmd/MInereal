@@ -84,6 +84,10 @@ export class DayNightCycle {
     this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
   }
 
+  public setTimeOfDay(time: number) {
+    this.timeOfDay = ((time % 1.0) + 1.0) % 1.0;
+  }
+
   public update(dt: number, playerPos: THREE.Vector3) {
     this.timeOfDay = (this.timeOfDay + dt / this.dayDurationSec) % 1.0;
 

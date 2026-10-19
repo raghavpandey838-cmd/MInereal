@@ -4,21 +4,25 @@
  */
 
 import React from 'react';
-import { ItemStack, PlayerStats, GameMode } from '../game/types';
+import { ItemStack } from '../game/types';
 import { getItemIcon } from '../game/textures';
 import { sounds } from '../game/audio';
 
 interface GameHUDProps {
-  stats: PlayerStats;
   hotbar: (ItemStack | null)[];
   selectedIndex: number;
-  gameMode: GameMode;
   onSelectSlot: (index: number) => void;
-  hurtFlash: boolean;
   isFlying: boolean;
   onToggleFly: () => void;
+  flySpeedMultiplier: number;
+  onToggleFlySpeed: () => void;
   onOpenBuildMenu: () => void;
+  onOpenAdvancements: () => void;
+  onSetTimeOfDay: (time: number) => void;
   onTeleportHome: () => void;
+  onSaveWaypoint: () => void;
+  onTeleportWaypoint: () => void;
+  hasCustomWaypoint: boolean;
   canUndo: boolean;
   onUndo: () => void;
   isLocked: boolean;
@@ -32,19 +36,24 @@ interface GameHUDProps {
   onOpenInventory: () => void;
   showMobileControls: boolean;
   onToggleMobileControls: () => void;
+  recentAdvancement: { title: string; description: string; icon: string } | null;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
-  stats,
   hotbar,
   selectedIndex,
-  gameMode,
   onSelectSlot,
-  hurtFlash,
   isFlying,
   onToggleFly,
+  flySpeedMultiplier,
+  onToggleFlySpeed,
   onOpenBuildMenu,
+  onOpenAdvancements,
+  onSetTimeOfDay,
   onTeleportHome,
+  onSaveWaypoint,
+  onTeleportWaypoint,
+  hasCustomWaypoint,
   canUndo,
   onUndo,
   isLocked,
@@ -58,42 +67,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onOpenInventory,
   showMobileControls,
   onToggleMobileControls,
+  recentAdvancement,
 }) => {
-  const hearts = [];
-  const fullHearts = Math.floor(stats.health / 2);
-  const halfHeart = stats.health % 2 >= 1;
-  for (let i = 0; i < 10; i++) {
-    if (i < fullHearts) {
-      hearts.push('full');
-    } else if (i === fullHearts && halfHeart) {
-      hearts.push('half');
-    } else {
-      hearts.push('empty');
-    }
-  }
-
-  const drumsticks = [];
-  const fullFood = Math.floor(stats.hunger / 2);
-  const halfFood = stats.hunger % 2 >= 1;
-  for (let i = 0; i < 10; i++) {
-    if (i < fullFood) {
-      drumsticks.push('full');
-    } else if (i === fullFood && halfFood) {
-      drumsticks.push('half');
-    } else {
-      drumsticks.push('empty');
-    }
-  }
-
-  const bubbles = Math.ceil((stats.oxygen / stats.maxOxygen) * 10);
-
   return (
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden flex flex-col justify-between">
-      {/* Hurt Flash Vignette */}
-      {hurtFlash && (
-        <div className="absolute inset-0 bg-red-600/35 transition-opacity duration-100 animate-pulse pointer-events-none z-10" />
-      )}
-
       {/* Screen Center Crosshair */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="drop-shadow-sm">
@@ -102,11 +79,29 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </svg>
       </div>
 
-      {/* Top Bar: Nav Coordinates, Compass, Vehicle Status & Action Toolbar */}
+      {/* Advancement Toast Notification (Top-Right Pop-In) */}
+      {recentAdvancement && (
+        <div className="absolute top-16 right-4 z-50 pointer-events-auto animate-bounce shadow-2xl">
+          <div className="bg-[#1f1a14] border-2 border-[#d97706] text-white px-4 py-2.5 rounded-lg flex items-center gap-3 max-w-sm backdrop-blur-md">
+            <span className="text-3xl p-1 bg-yellow-500/20 rounded border border-yellow-400">
+              {recentAdvancement.icon}
+            </span>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-yellow-400 font-bold flex items-center gap-1 font-mono">
+                <span>🏆 ADVANCEMENT MADE!</span>
+              </div>
+              <div className="font-bold text-sm text-yellow-100">{recentAdvancement.title}</div>
+              <div className="text-[11px] text-gray-300 leading-snug">{recentAdvancement.description}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Bar: Nav Coordinates, Time Controller, Flight Booster & Action Toolbar */}
       <div className="p-3 text-xs text-white/90 drop-shadow flex flex-wrap items-center justify-between gap-2 z-20">
         {/* Left: Compass & Coordinates Cluster */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="bg-black/60 px-3 py-1.5 rounded border border-white/20 flex items-center gap-2 font-mono shadow-md">
+        <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
+          <div className="bg-black/65 px-3 py-1.5 rounded border border-white/20 flex items-center gap-2 font-mono shadow-md">
             <span className="text-yellow-400 font-bold">🧭 {compassHeading}</span>
             <span className="text-white/40">|</span>
             <span className="text-cyan-300">
@@ -114,17 +109,41 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </span>
           </div>
 
-          {/* Quick Home/Spawn Teleport */}
+          {/* Quick Home / Spawn Teleport */}
           <button
             onClick={() => {
               sounds.playPop();
               onTeleportHome();
             }}
-            className="mc-btn px-2.5 py-1 text-[11px] font-bold cursor-pointer"
-            title="Teleport back to World Spawn (0, Y, 0)"
+            className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer"
+            title="Teleport to World Spawn (0, Y, 0)"
           >
             🏠 Spawn
           </button>
+
+          {/* Waypoint buttons */}
+          <button
+            onClick={() => {
+              sounds.playPop();
+              onSaveWaypoint();
+            }}
+            className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer text-cyan-200"
+            title="Save your current position as a custom teleport waypoint"
+          >
+            📍 Set WP
+          </button>
+          {hasCustomWaypoint && (
+            <button
+              onClick={() => {
+                sounds.playPop();
+                onTeleportWaypoint();
+              }}
+              className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer text-yellow-200"
+              title="Warp to your saved custom waypoint"
+            >
+              ⚡ Warp WP
+            </button>
+          )}
 
           {/* Audio Mute toggle */}
           <button
@@ -133,7 +152,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               onToggleMute();
             }}
             className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer"
-            title="Toggle Sound"
+            title="Toggle Audio"
           >
             {isMuted ? '🔇' : '🔊'}
           </button>
@@ -144,7 +163,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               sounds.playPop();
               onToggleMobileControls();
             }}
-            className={`mc-btn px-2.5 py-1 text-[11px] font-bold cursor-pointer transition-colors ${
+            className={`mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer transition-colors ${
               showMobileControls ? 'bg-green-700/80 border-green-400 text-green-100' : 'bg-black/60 text-gray-300'
             }`}
             title="Toggle Mobile On-Screen Keys"
@@ -153,7 +172,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </button>
         </div>
 
-        {/* Center: Active Vehicle Driving HUD or Click to Lock Banner */}
+        {/* Center: Active Vehicle Driving HUD or Desktop Click lock banner */}
         {mountedVehicle ? (
           <div className="bg-gradient-to-r from-blue-900/90 to-cyan-900/90 text-white px-4 py-1.5 rounded-full border border-cyan-400 flex items-center gap-3 shadow-xl pointer-events-auto animate-pulse">
             <span className="text-base">
@@ -161,7 +180,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </span>
             <div className="flex flex-col text-left leading-none">
               <span className="font-bold text-xs uppercase tracking-wide text-cyan-200">
-                {mountedVehicle.type === 'car' ? 'Driving Offroader Car' : mountedVehicle.type === 'bike' ? 'Riding Motorcycle' : 'Sailing Boat in Water'}
+                {mountedVehicle.type === 'car'
+                  ? 'Driving Offroader Car'
+                  : mountedVehicle.type === 'bike'
+                  ? 'Riding Motorcycle'
+                  : 'Sailing Boat in Water'}
               </span>
               <span className="text-[10px] text-white/80 font-mono mt-0.5">
                 Speed: {(Math.abs(mountedVehicle.speed) * 3.6).toFixed(0)} km/h · Steer with W A S D
@@ -180,49 +203,111 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         ) : !isLocked ? (
           <div className="bg-black/75 backdrop-blur-xs text-white px-3 py-1 rounded border border-white/20 font-bold text-xs shadow-lg pointer-events-none flex items-center gap-2">
             <span className="text-yellow-400">📱 Mobile:</span>
-            <span>Use W A S D keys on screen & swipe to look</span>
+            <span>Use onscreen WASD keys</span>
             <span className="text-white/40 hidden sm:inline">|</span>
             <span className="text-gray-300 hidden sm:inline">Desktop: Click to lock mouse</span>
           </div>
         ) : null}
 
-        {/* Right: Master Build Menu & Flight & Inventory Actions */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+        {/* Right: Master Build Menu, Advancements & Creative Power Toolbar */}
+        <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
+          {/* Celestial Time-of-day Quick Buttons */}
+          <div className="bg-black/60 px-1.5 py-1 rounded border border-white/20 flex items-center gap-1 shadow-md">
+            <button
+              onClick={() => {
+                sounds.playPop();
+                onSetTimeOfDay(0.5); // Noon
+              }}
+              className="px-1.5 py-0.5 hover:bg-yellow-500/40 rounded text-[11px] cursor-pointer"
+              title="Set High Noon (Sunny Day)"
+            >
+              ☀️ Noon
+            </button>
+            <button
+              onClick={() => {
+                sounds.playPop();
+                onSetTimeOfDay(0.75); // Sunset
+              }}
+              className="px-1.5 py-0.5 hover:bg-orange-500/40 rounded text-[11px] cursor-pointer"
+              title="Set Golden Sunset"
+            >
+              🌅 Sunset
+            </button>
+            <button
+              onClick={() => {
+                sounds.playPop();
+                onSetTimeOfDay(0.0); // Midnight
+              }}
+              className="px-1.5 py-0.5 hover:bg-indigo-500/40 rounded text-[11px] cursor-pointer"
+              title="Set Starry Midnight"
+            >
+              🌙 Night
+            </button>
+          </div>
+
+          {/* Flight Mode Toggle & Speed Boost */}
+          <div className="flex items-center">
+            <button
+              onClick={() => {
+                sounds.playPop();
+                onToggleFly();
+              }}
+              className={`mc-btn px-2.5 py-1.5 text-xs font-bold cursor-pointer flex items-center gap-1 ${
+                isFlying ? 'bg-cyan-700 text-cyan-100 border-cyan-400' : ''
+              }`}
+              title="Toggle Flight Mode [F] (Space to fly up, Shift to fly down)"
+            >
+              <span>🕊️</span>
+              <span>{isFlying ? 'FLY ON' : 'FLY [F]'}</span>
+            </button>
+            {isFlying && (
+              <button
+                onClick={() => {
+                  sounds.playPop();
+                  onToggleFlySpeed();
+                }}
+                className="mc-btn px-2 py-1.5 text-xs font-bold cursor-pointer text-yellow-300 ml-1"
+                title="Cycle Flight Speed (1x, 2x, 3x)"
+              >
+                🚀 {flySpeedMultiplier}x
+              </button>
+            )}
+          </div>
+
+          {/* Advancements Modal Button */}
+          <button
+            onClick={() => {
+              sounds.playPop();
+              onOpenAdvancements();
+            }}
+            className="mc-btn px-2.5 py-1.5 text-xs font-bold text-yellow-300 hover:text-white cursor-pointer shadow-lg flex items-center gap-1 border-2 border-yellow-500/60"
+            title="Open Advancements & Trophies"
+          >
+            <span>🏆</span>
+            <span className="hidden sm:inline">TROPHIES</span>
+          </button>
+
           {/* Build Menu Trigger */}
           <button
             onClick={() => {
               sounds.playPop();
               onOpenBuildMenu();
             }}
-            className="mc-btn px-3 py-1.5 text-xs font-bold text-yellow-300 hover:text-white cursor-pointer shadow-lg flex items-center gap-1.5 border-2 border-yellow-500/50"
+            className="mc-btn px-3 py-1.5 text-xs font-bold text-yellow-200 hover:text-white cursor-pointer shadow-lg flex items-center gap-1.5 border-2 border-yellow-400 bg-gradient-to-b from-[#3b6ea5] to-[#254668]"
+            title="Open Master Build Menu [B]"
           >
             <span>⚒️</span>
-            <span>BUILD MENU [B]</span>
+            <span>BUILD [B]</span>
           </button>
 
-          {/* Flight Mode Toggle */}
-          <button
-            onClick={() => {
-              sounds.playPop();
-              onToggleFly();
-            }}
-            className={`mc-btn px-2.5 py-1.5 text-xs font-bold cursor-pointer flex items-center gap-1 ${
-              isFlying ? 'bg-cyan-700 text-cyan-100 border-cyan-400' : ''
-            }`}
-            title="Toggle Fly Mode (Space to rise, Shift to sink) - Key: F"
-          >
-            <span>🕊️</span>
-            <span>{isFlying ? 'FLYING (ON)' : 'FLY [F]'}</span>
-          </button>
-
-          {/* Inventory Button */}
+          {/* Bag / Inventory */}
           <button
             onClick={() => {
               sounds.playPop();
               onOpenInventory();
             }}
             className="mc-btn px-2.5 py-1.5 text-xs font-bold cursor-pointer"
-            title="Open Inventory (Key: E)"
+            title="Open Creative Palette / Inventory [E]"
           >
             🎒 Bag [E]
           </button>
@@ -268,110 +353,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </button>
       </div>
 
-      {/* Bottom HUD: Hearts, Hunger, XP, Hotbar */}
+      {/* Bottom HUD: Hotbar & Creative Hint Strip */}
       <div className="flex flex-col items-center pb-3 w-full">
-        {/* Survival Status Rows (Hearts & Hunger & Air) */}
-        {gameMode === 'survival' && (
-          <div className="w-[364px] flex flex-col gap-1 mb-1.5">
-            {/* Oxygen Bubbles if swimming */}
-            {stats.oxygen < stats.maxOxygen && (
-              <div className="flex justify-end gap-1 mb-0.5">
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <div
-                    key={`bubble-${i}`}
-                    className={`w-3.5 h-3.5 rounded-full border border-blue-400 ${
-                      i < bubbles ? 'bg-cyan-400' : 'bg-transparent'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-
-            <div className="flex justify-between items-center px-1">
-              {/* 10 Hearts */}
-              <div className="flex gap-1">
-                {hearts.map((type, i) => (
-                  <div
-                    key={`heart-${i}`}
-                    className={`w-4 h-4 flex items-center justify-center ${
-                      stats.health <= 4 ? 'animate-bounce' : ''
-                    }`}
-                  >
-                    <svg viewBox="0 0 16 16" className="w-4 h-4">
-                      {type === 'full' ? (
-                        <path
-                          d="M8 14s-6-4-6-8a4 4 0 0 1 6-3 4 4 0 0 1 6 3c0 4-6 8-6 8z"
-                          fill="#ff2222"
-                          stroke="#4a0000"
-                          strokeWidth="1.2"
-                        />
-                      ) : type === 'half' ? (
-                        <>
-                          <path
-                            d="M8 14s-6-4-6-8a4 4 0 0 1 6-3v11z"
-                            fill="#ff2222"
-                            stroke="#4a0000"
-                            strokeWidth="1.2"
-                          />
-                          <path
-                            d="M8 3a4 4 0 0 1 6 3c0 4-6 8-6 8v-11z"
-                            fill="#441111"
-                            stroke="#4a0000"
-                            strokeWidth="1.2"
-                          />
-                        </>
-                      ) : (
-                        <path
-                          d="M8 14s-6-4-6-8a4 4 0 0 1 6-3 4 4 0 0 1 6 3c0 4-6 8-6 8z"
-                          fill="#331111"
-                          stroke="#220000"
-                          strokeWidth="1.2"
-                        />
-                      )}
-                    </svg>
-                  </div>
-                ))}
-              </div>
-
-              {/* 10 Hunger Drumsticks */}
-              <div className="flex gap-1">
-                {drumsticks.map((type, i) => (
-                  <div key={`hunger-${i}`} className="w-4 h-4 flex items-center justify-center">
-                    <svg viewBox="0 0 16 16" className="w-4 h-4">
-                      <circle
-                        cx="9"
-                        cy="7"
-                        r="5"
-                        fill={type === 'full' ? '#c77826' : type === 'half' ? '#9e5917' : '#3d2510'}
-                        stroke="#231407"
-                        strokeWidth="1.2"
-                      />
-                      <rect
-                        x="3"
-                        y="10"
-                        width="3"
-                        height="4"
-                        fill="#f0ebd8"
-                        stroke="#4a3b2c"
-                        strokeWidth="0.8"
-                      />
-                    </svg>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Experience Bar */}
-        <div className="relative w-[364px] h-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-xs mb-1">
-          <div
-            className="h-full bg-gradient-to-r from-[#62d936] to-[#87f55b] transition-all duration-150"
-            style={{ width: `${Math.min(100, stats.experience * 100)}%` }}
-          />
-          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-xs font-bold text-[#7fff00] drop-shadow-[0_1.5px_1px_rgba(0,0,0,1)]">
-            {stats.level}
-          </div>
+        {/* Creative Badge Strip */}
+        <div className="flex items-center gap-2 mb-1.5 font-mono text-[11px] bg-black/60 px-3 py-0.5 rounded-full border border-white/20 text-yellow-300 drop-shadow">
+          <span>⭐ CREATIVE MODE</span>
+          <span className="text-white/40">|</span>
+          <span className="text-green-300">Infinite Blocks</span>
+          <span className="text-white/40">|</span>
+          <span className="text-cyan-300">Instant 1-Click Break</span>
         </div>
 
         {/* 9-Slot Authentic Hotbar (Single-Click Responsive) */}
@@ -406,29 +396,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   />
                 )}
 
-                {/* Count Badge */}
-                {slot && slot.count > 1 && (
-                  <span className="absolute bottom-0.5 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow-[1px_1px_0px_#222]">
-                    {slot.count}
+                {/* Count Badge (∞ in Creative Mode!) */}
+                {slot && (
+                  <span className="absolute bottom-0.5 right-1 text-[10px] sm:text-xs font-bold text-yellow-300 drop-shadow-[1px_1px_0px_#222]">
+                    ∞
                   </span>
-                )}
-
-                {/* Durability Bar */}
-                {slot && slot.durability !== undefined && slot.maxDurability && (
-                  <div className="absolute bottom-0.5 left-1 right-1 h-1 bg-black/60 rounded-xs overflow-hidden">
-                    <div
-                      className="h-full bg-green-500"
-                      style={{
-                        width: `${(slot.durability / slot.maxDurability) * 100}%`,
-                        backgroundColor:
-                          slot.durability / slot.maxDurability > 0.5
-                            ? '#22c55e'
-                            : slot.durability / slot.maxDurability > 0.2
-                            ? '#eab308'
-                            : '#ef4444',
-                      }}
-                    />
-                  </div>
                 )}
               </button>
             );
@@ -437,11 +409,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
         {/* Hotbar Hint & Quick Controls */}
         <div className="text-[10px] text-white/80 mt-1 drop-shadow flex flex-wrap justify-center gap-2 font-mono px-2 text-center">
-          <span className="text-yellow-300 font-bold">W A S D Keys to Move</span>
-          <span>⛏️ Hold MINE</span>
-          <span>🧱 Tap PLACE</span>
+          <span className="text-yellow-300 font-bold">W A S D to Move</span>
+          <span>⛏️ Click to Break (Instant)</span>
+          <span>🧱 Tap to Place</span>
           <span>🕊️ Fly [F]</span>
-          <span>🎒 Bag [E]</span>
+          <span>🏛️ Build Menu [B]</span>
+          <span>🏆 Trophies</span>
         </div>
       </div>
     </div>

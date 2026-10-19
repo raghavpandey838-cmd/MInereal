@@ -14,10 +14,13 @@ interface MobileControlsProps {
   onRotateCamera: (deltaYaw: number) => void;
   isFlying: boolean;
   onToggleFly: () => void;
+  flySpeedMultiplier: number;
+  onToggleFlySpeed: () => void;
   isMounted: boolean;
   onDismount: () => void;
   onOpenInventory: () => void;
   onOpenBuildMenu: () => void;
+  onOpenAdvancements: () => void;
   canUndo: boolean;
   onUndo: () => void;
   onTeleportHome: () => void;
@@ -31,10 +34,13 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
   onRotateCamera,
   isFlying,
   onToggleFly,
+  flySpeedMultiplier,
+  onToggleFlySpeed,
   isMounted,
   onDismount,
   onOpenInventory,
   onOpenBuildMenu,
+  onOpenAdvancements,
   canUndo,
   onUndo,
   onTeleportHome,
@@ -71,7 +77,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
   return (
     <div className="absolute inset-0 pointer-events-none select-none z-30 flex flex-col justify-between">
       {/* Top Floating Mobile Toolbar */}
-      <div className="px-2 pt-14 flex items-center justify-between pointer-events-auto">
+      <div className="px-2 pt-14 flex items-center justify-between pointer-events-auto flex-wrap gap-1">
         <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-xs p-1.5 rounded-lg border border-white/20">
           {/* Quick Turn Left */}
           <button
@@ -116,6 +122,22 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           >
             🕊️
           </button>
+
+          {/* Fly Speed Booster */}
+          {isFlying && (
+            <button
+              onTouchStart={(e) => {
+                e.preventDefault();
+                onToggleFlySpeed();
+                sounds.playPop();
+              }}
+              onClick={onToggleFlySpeed}
+              className="w-9 h-9 mc-btn flex items-center justify-center text-[10px] font-bold text-yellow-300 active:scale-95"
+              title="Fly Speed Booster"
+            >
+              🚀{flySpeedMultiplier}x
+            </button>
+          )}
 
           {/* Undo Button */}
           <button
@@ -166,6 +188,21 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
             </button>
           )}
 
+          {/* Advancements [🏆] */}
+          <button
+            onTouchStart={(e) => {
+              e.preventDefault();
+              onOpenAdvancements();
+              sounds.playPop();
+            }}
+            onClick={onOpenAdvancements}
+            className="px-2.5 h-9 mc-btn flex items-center gap-1 text-xs font-bold text-yellow-300 active:scale-95 border-yellow-500/60"
+            title="Open Advancements"
+          >
+            <span>🏆</span>
+            <span className="hidden sm:inline">TROPHIES</span>
+          </button>
+
           {/* Build Menu [B] */}
           <button
             onTouchStart={(e) => {
@@ -174,7 +211,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               sounds.playPop();
             }}
             onClick={onOpenBuildMenu}
-            className="px-2.5 h-9 mc-btn flex items-center gap-1 text-xs font-bold text-yellow-300 active:scale-95 border-yellow-500/60"
+            className="px-2.5 h-9 mc-btn flex items-center gap-1 text-xs font-bold text-yellow-200 active:scale-95 border-yellow-400 bg-[#3b6ea5]"
           >
             <span>⚒️</span>
             <span>BUILD</span>
@@ -350,11 +387,11 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           </div>
         </div>
 
-        {/* Right Side: Action Cluster (Jump, Mine/Attack, Place/Use, Down) */}
+        {/* Right Side: Action Cluster (Jump, Instant Mine, Place) */}
         <div className="pointer-events-auto flex flex-col items-end gap-2.5">
-          {/* Secondary Action Row: Mine & Place */}
+          {/* Action Row: Mine & Place */}
           <div className="flex gap-2">
-            {/* MINE / ATTACK BUTTON (Hold to mine, tap to strike) */}
+            {/* INSTANT MINE BUTTON (Tap/Hold to break block instantly in Creative) */}
             <button
               onTouchStart={(e) => {
                 e.preventDefault();
@@ -382,15 +419,15 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               className={`w-14 h-14 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-xl transition-all border-2 ${
                 isMiningActive
                   ? 'bg-red-700/90 border-red-300 scale-95 animate-pulse'
-                  : 'bg-gradient-to-b from-[#6b2121]/90 to-[#3f1212]/90 border-red-400/80 hover:bg-red-800'
+                  : 'bg-gradient-to-b from-[#7f1d1d]/90 to-[#450a0a]/90 border-red-400/80 hover:bg-red-800'
               }`}
-              title="Hold to Mine Block / Tap to Attack Mob"
+              title="Instant Break Block / Attack"
             >
               <span className="text-base leading-none">⛏️</span>
               <span className="text-[9px] font-bold tracking-tight text-red-200">MINE</span>
             </button>
 
-            {/* PLACE / USE / INTERACT BUTTON */}
+            {/* PLACE / USE BUTTON */}
             <button
               onTouchStart={(e) => {
                 e.preventDefault();
@@ -401,17 +438,17 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
                 onInteract();
                 sounds.playPop();
               }}
-              className="w-14 h-14 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-xl transition-all border-2 bg-gradient-to-b from-[#1e4e2a]/90 to-[#122e1a]/90 border-green-400/80 active:scale-95 hover:bg-green-800"
-              title="Place Block / Open Crafting or Chest"
+              className="w-14 h-14 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-xl transition-all border-2 bg-gradient-to-b from-[#14532d]/90 to-[#052e16]/90 border-green-400/80 active:scale-95 hover:bg-green-800"
+              title="Place Block / Interact"
             >
               <span className="text-base leading-none">🧱</span>
               <span className="text-[9px] font-bold tracking-tight text-green-200">PLACE</span>
             </button>
           </div>
 
-          {/* Primary Action Row: Jump and Sink */}
+          {/* Action Row: Jump and Fly Down */}
           <div className="flex items-center gap-2">
-            {/* Fly Down / Sink Button (shown when flying or sneaking) */}
+            {/* Fly Down Button (shown when flying) */}
             {isFlying && (
               <button
                 onTouchStart={(e) => {
@@ -440,7 +477,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               </button>
             )}
 
-            {/* JUMP BUTTON (Large right-thumb primary button) */}
+            {/* JUMP BUTTON */}
             <button
               onTouchStart={(e) => {
                 e.preventDefault();

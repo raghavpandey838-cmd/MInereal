@@ -33,8 +33,11 @@ import { PauseMenu } from './components/PauseMenu';
 import { DeathScreen } from './components/DeathScreen';
 import { F3DebugScreen } from './components/F3DebugScreen';
 import { MobileControls } from './components/MobileControls';
+import { AdvancementsModal } from './components/AdvancementsModal';
+import { CreativeToolType } from './components/BuildMenuModal';
+import { Advancement, INITIAL_ADVANCEMENTS } from './game/advancements';
 
-type ModalType = 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'build';
+type ModalType = 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'build' | 'advancements';
 
 interface HistoryStep {
   x: number;
@@ -52,10 +55,10 @@ export default function App() {
   const lastTouchX = useRef<number>(0);
   const lastTouchY = useRef<number>(0);
 
-  // Game UI States
+  // Game UI States (Pure Creative Mode!)
   const [gameState, setGameState] = useState<'title' | 'playing' | 'paused' | 'dead'>('title');
   const [activeModal, setActiveModal] = useState<ModalType>('none');
-  const [gameMode, setGameMode] = useState<GameMode>('survival');
+  const [gameMode, setGameMode] = useState<GameMode>('creative');
   const [selectedHotbarIndex, setSelectedHotbarIndex] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [showF3, setShowF3] = useState<boolean>(false);
@@ -64,8 +67,15 @@ export default function App() {
   const [savedWorldAvailable, setSavedWorldAvailable] = useState<boolean>(false);
   const [showMobileControls, setShowMobileControls] = useState<boolean>(true);
 
+  // Advancements & Creative Achievements
+  const [advancements, setAdvancements] = useState<Advancement[]>(INITIAL_ADVANCEMENTS);
+  const [recentAdvancement, setRecentAdvancement] = useState<Advancement | null>(null);
+  const structuresBuiltCount = useRef<number>(0);
+
   // Navigation, Flight & Vehicle States
-  const [isFlying, setIsFlying] = useState<boolean>(false);
+  const [isFlying, setIsFlying] = useState<boolean>(true);
+  const [flySpeedMultiplier, setFlySpeedMultiplier] = useState<number>(1);
+  const [customWaypoint, setCustomWaypoint] = useState<{ x: number; y: number; z: number } | null>(null);
   const [isPointerLocked, setIsPointerLocked] = useState<boolean>(false);
   const [compassHeading, setCompassHeading] = useState<string>('N (0°)');
   const [playerCoords, setPlayerCoords] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 30, z: 0 });
@@ -74,13 +84,28 @@ export default function App() {
   // Undo / Build History Stack
   const [buildHistory, setBuildHistory] = useState<HistoryStep[][]>([]);
 
-  // Player Stats
+  // Unlock an Advancement helper with sound and toast banner
+  const unlockAdvancement = useCallback((id: string) => {
+    setAdvancements((prev) => {
+      const adv = prev.find((a) => a.id === id);
+      if (!adv || adv.unlocked) return prev;
+      sounds.playLevelUp();
+      const updated = { ...adv, unlocked: true, unlockedAt: Date.now() };
+      setRecentAdvancement(updated);
+      setTimeout(() => {
+        setRecentAdvancement((curr) => (curr?.id === id ? null : curr));
+      }, 4500);
+      return prev.map((a) => (a.id === id ? updated : a));
+    });
+  }, []);
+
+  // Player Stats (Preserved for compatibility, damage disabled in Creative)
   const [playerStats, setPlayerStats] = useState<PlayerStats>({
     health: 20,
     maxHealth: 20,
     hunger: 20,
     maxHunger: 20,
-    saturation: 5,
+    saturation: 20,
     oxygen: 20,
     maxOxygen: 20,
     experience: 0,
@@ -88,18 +113,18 @@ export default function App() {
     armor: 0,
   });
 
-  // 36-slot Player Inventory (0..8 is Hotbar, 9..35 is Main Inventory)
+  // 36-slot Player Inventory (Equipped with rich Creative blocks & tools!)
   const [inventory, setInventory] = useState<(ItemStack | null)[]>(() => {
     const inv: (ItemStack | null)[] = new Array(36).fill(null);
-    inv[0] = { id: 'wooden_pickaxe', count: 1, durability: 60, maxDurability: 60 };
-    inv[1] = { id: 'wooden_sword', count: 1, durability: 60, maxDurability: 60 };
-    inv[2] = { id: 'wooden_axe', count: 1, durability: 60, maxDurability: 60 };
-    inv[3] = { id: 'torch', count: 64 };
-    inv[4] = { id: 'bread', count: 16 };
-    inv[5] = { id: 'oak_planks', count: 64 };
-    inv[6] = { id: 'bricks', count: 64 };
-    inv[7] = { id: 'glass', count: 64 };
-    inv[8] = { id: 'cobblestone', count: 64 };
+    inv[0] = { id: 'diamond_pickaxe', count: 1 };
+    inv[1] = { id: 'diamond_sword', count: 1 };
+    inv[2] = { id: 'oak_planks', count: 64 };
+    inv[3] = { id: 'bricks', count: 64 };
+    inv[4] = { id: 'glass', count: 64 };
+    inv[5] = { id: 'stone', count: 64 };
+    inv[6] = { id: 'bookshelf', count: 64 };
+    inv[7] = { id: 'tnt', count: 64 };
+    inv[8] = { id: 'torch', count: 64 };
     return inv;
   });
 
@@ -381,10 +406,16 @@ export default function App() {
     placeStructure(engine.world, originX, originY, originZ, template, (history) => {
       setBuildHistory((prev) => [...prev.slice(-49), history]);
     });
+
+    structuresBuiltCount.current += 1;
+    unlockAdvancement('first_blueprint');
+    if (structuresBuiltCount.current >= 3) {
+      unlockAdvancement('grand_architect');
+    }
   };
 
-  // Select Multi-Block Tool
-  const handleSelectTool = (toolType: 'wall3x3' | 'floor5x5' | 'column4') => {
+  // Select Super Tool / Multi-Block WorldEdit
+  const handleSelectTool = (toolType: CreativeToolType) => {
     const engine = engineRef.current;
     if (!engine) return;
 
@@ -400,7 +431,97 @@ export default function App() {
     const history: HistoryStep[] = [];
     const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion);
 
-    if (toolType === 'wall3x3') {
+    if (toolType === 'sphereDome') {
+      // 7x7 Glass Biodome around target
+      const cx = Math.floor(engine.playerPos.x + forwardDir.x * 5);
+      const cz = Math.floor(engine.playerPos.z + forwardDir.z * 5);
+      const cy = Math.floor(engine.playerPos.y);
+      const radius = 3.5;
+
+      for (let dx = -4; dx <= 4; dx++) {
+        for (let dy = 0; dy <= 4; dy++) {
+          for (let dz = -4; dz <= 4; dz++) {
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (dist >= radius - 0.7 && dist <= radius + 0.3) {
+              const wx = cx + dx;
+              const wy = cy + dy;
+              const wz = cz + dz;
+              if (wy >= 0 && wy < 64) {
+                const oldType = engine.world.getBlock(wx, wy, wz);
+                history.push({ x: wx, y: wy, z: wz, oldType, newType: BlockType.GLASS });
+                engine.world.setBlock(wx, wy, wz, BlockType.GLASS);
+              }
+            }
+          }
+        }
+      }
+      unlockAdvancement('world_edit');
+    } else if (toolType === 'highway') {
+      // 3-wide smooth stone road extending 12 blocks ahead
+      const startX = Math.floor(engine.playerPos.x);
+      const startZ = Math.floor(engine.playerPos.z);
+      const groundY = Math.floor(engine.playerPos.y) - 1;
+
+      const stepX = Math.abs(forwardDir.x) > Math.abs(forwardDir.z) ? Math.sign(forwardDir.x) : 0;
+      const stepZ = stepX === 0 ? Math.sign(forwardDir.z) : 0;
+      const perpX = stepZ !== 0 ? 1 : 0;
+      const perpZ = stepX !== 0 ? 1 : 0;
+
+      for (let dist = 1; dist <= 12; dist++) {
+        for (let p = -1; p <= 1; p++) {
+          const wx = startX + stepX * dist + perpX * p;
+          const wz = startZ + stepZ * dist + perpZ * p;
+          if (groundY >= 0 && groundY < 64) {
+            const oldType = engine.world.getBlock(wx, groundY, wz);
+            history.push({ x: wx, y: groundY, z: wz, oldType, newType: BlockType.STONE });
+            engine.world.setBlock(wx, groundY, wz, BlockType.STONE);
+          }
+        }
+      }
+      unlockAdvancement('world_edit');
+    } else if (toolType === 'demolish') {
+      // Clear 5x5x5 cubic area in front of player
+      const cx = Math.floor(engine.playerPos.x + forwardDir.x * 3.5);
+      const cz = Math.floor(engine.playerPos.z + forwardDir.z * 3.5);
+      const cy = Math.floor(engine.playerPos.y);
+
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -1; dy <= 3; dy++) {
+          for (let dz = -2; dz <= 2; dz++) {
+            const wx = cx + dx;
+            const wy = cy + dy;
+            const wz = cz + dz;
+            if (wy >= 0 && wy < 64) {
+              const oldType = engine.world.getBlock(wx, wy, wz);
+              if (oldType !== BlockType.AIR) {
+                history.push({ x: wx, y: wy, z: wz, oldType, newType: BlockType.AIR });
+                engine.world.setBlock(wx, wy, wz, BlockType.AIR);
+              }
+            }
+          }
+        }
+      }
+      unlockAdvancement('world_edit');
+    } else if (toolType === 'tntCluster') {
+      // 3x3 TNT Cluster
+      const cx = Math.floor(engine.playerPos.x + forwardDir.x * 3.5);
+      const cz = Math.floor(engine.playerPos.z + forwardDir.z * 3.5);
+      const cy = Math.floor(engine.playerPos.y);
+
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const wx = cx + dx;
+          const wy = cy;
+          const wz = cz + dz;
+          if (wy >= 0 && wy < 64) {
+            const oldType = engine.world.getBlock(wx, wy, wz);
+            history.push({ x: wx, y: wy, z: wz, oldType, newType: BlockType.TNT });
+            engine.world.setBlock(wx, wy, wz, BlockType.TNT);
+          }
+        }
+      }
+      unlockAdvancement('world_edit');
+    } else if (toolType === 'wall3x3') {
       const centerX = Math.floor(engine.playerPos.x + forwardDir.x * 2.5);
       const centerZ = Math.floor(engine.playerPos.z + forwardDir.z * 2.5);
       const baseY = Math.floor(engine.playerPos.y);
@@ -418,6 +539,7 @@ export default function App() {
           }
         }
       }
+      unlockAdvancement('world_edit');
     } else if (toolType === 'floor5x5') {
       const centerX = Math.floor(engine.playerPos.x);
       const centerZ = Math.floor(engine.playerPos.z);
@@ -434,6 +556,7 @@ export default function App() {
           }
         }
       }
+      unlockAdvancement('world_edit');
     } else if (toolType === 'column4') {
       const targetX = Math.floor(engine.playerPos.x + forwardDir.x * 1.5);
       const targetZ = Math.floor(engine.playerPos.z + forwardDir.z * 1.5);
@@ -447,6 +570,7 @@ export default function App() {
           engine.world.setBlock(targetX, wy, targetZ, blockType);
         }
       }
+      unlockAdvancement('world_edit');
     }
 
     if (history.length > 0) {
@@ -470,11 +594,58 @@ export default function App() {
     let sy = engine.playerPos.y;
     if (type === 'boat') {
       sy = 24.0;
+      unlockAdvancement('sea_captain');
     } else {
       sy = engine.world.findHighestSolidY(Math.floor(sx), Math.floor(sz)) + 0.5;
     }
 
     engine.vehicles.spawnVehicle(type, sx, sy, sz, engine.cameraYaw);
+  };
+
+  // Spawn an interactive mob in creative mode
+  const handleSpawnMob = (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper') => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion);
+    const sx = engine.playerPos.x + forwardDir.x * 3.0;
+    const sz = engine.playerPos.z + forwardDir.z * 3.0;
+    const sy = engine.world.findHighestSolidY(Math.floor(sx), Math.floor(sz)) + 1;
+
+    engine.entities.spawnMob(type, sx, sy, sz);
+    engine.entities.spawnParticleBurst(sx, sy + 0.5, sz, '#ffffff', 8);
+    sounds.playPop();
+    unlockAdvancement('life_creator');
+  };
+
+  // Set Celestial Time of Day (0.5 = Noon, 0.75 = Sunset, 0.0 = Night, 0.25 = Morning)
+  const handleSetTimeOfDay = (timeVal: number) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.sky.setTimeOfDay(timeVal);
+    unlockAdvancement('time_lord');
+  };
+
+  // Save current location as a custom Waypoint
+  const handleSaveWaypoint = () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    setCustomWaypoint({
+      x: engine.playerPos.x,
+      y: engine.playerPos.y,
+      z: engine.playerPos.z,
+    });
+    sounds.playLevelUp();
+  };
+
+  // Teleport to custom Waypoint
+  const handleTeleportWaypoint = () => {
+    const engine = engineRef.current;
+    if (!engine || !customWaypoint) return;
+    engine.playerPos.set(customWaypoint.x, customWaypoint.y, customWaypoint.z);
+    engine.playerVel.set(0, 0, 0);
+    sounds.playLevelUp();
+    unlockAdvancement('waypoint_travel');
   };
 
   // Select Item from Creative Block Palette
@@ -589,7 +760,7 @@ export default function App() {
         const isSprinting = !!(keys['ControlLeft'] || keys['ControlRight']);
         const isSneaking = !!(keys['ShiftLeft'] || keys['ShiftRight']);
         const moveSpeed = isFlying
-          ? (isSprinting ? 14.0 : 8.0)
+          ? (isSprinting ? 18.0 : 11.0) * flySpeedMultiplier
           : isSprinting
           ? PhysicsEngine.SPRINT_SPEED
           : isSneaking
@@ -611,7 +782,7 @@ export default function App() {
         const targetVx = (moveRight * cosYaw - moveForward * sinYaw) * moveSpeed;
         const targetVz = (moveRight * sinYaw + moveForward * cosYaw) * moveSpeed;
 
-        const accel = (isFlying ? 18.0 : 14.0) * dt;
+        const accel = (isFlying ? 20.0 : 14.0) * dt;
         playerVel.x += (targetVx - playerVel.x) * accel;
         playerVel.z += (targetVz - playerVel.z) * accel;
 
@@ -624,39 +795,36 @@ export default function App() {
         if (isFlying) {
           engine.fallDistance = 0;
           let targetVy = 0;
-          if (keys['Space']) targetVy += 7.0;
-          if (keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyC'] || keys['c']) targetVy -= 7.0;
-          playerVel.y += (targetVy - playerVel.y) * 14.0 * dt;
+          if (keys['Space']) targetVy += 8.5 * flySpeedMultiplier;
+          if (keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyC'] || keys['c']) targetVy -= 8.5 * flySpeedMultiplier;
+          playerVel.y += (targetVy - playerVel.y) * 16.0 * dt;
         } else if (inWater) {
           playerVel.y -= PhysicsEngine.GRAVITY * 0.3 * dt;
           playerVel.y *= 0.85;
           if (keys['Space']) {
             playerVel.y = PhysicsEngine.SWIM_SPEED;
           }
-          if (headBlock === BlockType.WATER) {
-            setPlayerStats((prev) => {
-              const nextOx = Math.max(0, prev.oxygen - dt * 2.5);
-              if (nextOx <= 0 && time - engine.lastHurtTime > 1500) {
-                engine.lastHurtTime = time;
-                applyPlayerDamage(2);
-              }
-              return { ...prev, oxygen: nextOx };
-            });
-          }
         } else {
-          setPlayerStats((prev) => ({
-            ...prev,
-            oxygen: Math.min(prev.maxOxygen, prev.oxygen + dt * 10),
-          }));
-
           playerVel.y -= PhysicsEngine.GRAVITY * dt;
           if (playerVel.y < -PhysicsEngine.TERMINAL_VELOCITY) {
             playerVel.y = -PhysicsEngine.TERMINAL_VELOCITY;
           }
         }
 
+        // Void Rescue Protection (Never die from falling into void)
+        if (playerPos.y < -15) {
+          const spawnY = world.findHighestSolidY(0, 0) + 2;
+          playerPos.set(0.5, spawnY, 0.5);
+          playerVel.set(0, 0, 0);
+          sounds.playLevelUp();
+        }
+
+        // Sky High Altitude Advancement
+        if (playerPos.y > 60) {
+          unlockAdvancement('sky_high');
+        }
+
         // Move entity with physics
-        const preMoveY = playerPos.y;
         const moveRes = PhysicsEngine.moveEntity(world, playerPos, playerVel, 0.3, 1.8, dt, !isFlying);
 
         // Jump
