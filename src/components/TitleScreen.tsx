@@ -80,9 +80,18 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           </div>
         </div>
 
+        {/* Developed by Raghav Pandey Banner directly below MINECRAFT */}
+        <div className="mt-3 px-5 py-2 rounded-lg bg-black/75 border-2 border-[#f59e0b] shadow-[0_6px_24px_rgba(245,158,11,0.45)] flex items-center gap-2.5 backdrop-blur-sm">
+          <span className="text-[#fbbf24] text-base animate-pulse">✦</span>
+          <span className="mc-font text-base sm:text-lg font-bold text-[#fef08a] tracking-wider drop-shadow-[2px_2px_0px_#000000]">
+            developed by Raghav Pandey
+          </span>
+          <span className="text-[#fbbf24] text-base animate-pulse">✦</span>
+        </div>
+
         {/* Creative Badge */}
-        <div className="mt-2 bg-yellow-500/90 text-black px-3 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase border border-yellow-200 shadow-md">
-          ⭐ 100% Creative Sandbox Mode ⭐
+        <div className="mt-2.5 bg-emerald-700/90 text-white px-3.5 py-1 rounded-full text-xs font-bold tracking-wider uppercase border border-emerald-400 shadow-lg">
+          ⭐ Infinite Creative & Building Sandbox ⭐
         </div>
       </div>
 

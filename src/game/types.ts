@@ -35,6 +35,78 @@ export enum BlockType {
   POPPY = 28,
   DANDELION = 29,
   SNOW = 30,
+  BIRCH_PLANKS = 31,
+  SPRUCE_PLANKS = 32,
+  STONE_BRICKS = 33,
+  MOSSY_COBBLESTONE = 34,
+  SMOOTH_STONE = 35,
+  SANDSTONE = 36,
+  QUARTZ_BLOCK = 37,
+  NETHER_BRICKS = 38,
+  GLOWSTONE = 39,
+  SEA_LANTERN = 40,
+  REDSTONE_LAMP = 41,
+  HAY_BALE = 42,
+  GOLD_BLOCK = 43,
+  DIAMOND_BLOCK = 44,
+  EMERALD_BLOCK = 45,
+  IRON_BLOCK = 46,
+  LAPIS_BLOCK = 47,
+  PUMPKIN = 48,
+  MELON = 49,
+  TERRACOTTA_ORANGE = 50,
+  TERRACOTTA_CYAN = 51,
+  ICE = 52,
+  LAVA = 53,
+  BIRCH_LOG = 54,
+  // Extensive Real Minecraft Blocks
+  JUNGLE_PLANKS = 55,
+  ACACIA_PLANKS = 56,
+  DARK_OAK_PLANKS = 57,
+  CRACKED_STONE_BRICKS = 58,
+  RED_SANDSTONE = 59,
+  PURPUR_BLOCK = 60,
+  END_STONE = 61,
+  AMETHYST_BLOCK = 62,
+  COPPER_BLOCK = 63,
+  COAL_BLOCK = 64,
+  REDSTONE_BLOCK = 65,
+  SLIME_BLOCK = 66,
+  HONEY_BLOCK = 67,
+  WHITE_WOOL = 68,
+  RED_WOOL = 69,
+  BLUE_WOOL = 70,
+  YELLOW_WOOL = 71,
+  GREEN_WOOL = 72,
+  BLACK_WOOL = 73,
+  PINK_WOOL = 74,
+  PURPLE_WOOL = 75,
+  WHITE_CONCRETE = 76,
+  RED_CONCRETE = 77,
+  BLUE_CONCRETE = 78,
+  YELLOW_CONCRETE = 79,
+  GREEN_CONCRETE = 80,
+  BLACK_CONCRETE = 81,
+  STAINED_GLASS_CYAN = 82,
+  STAINED_GLASS_RED = 83,
+  STAINED_GLASS_WHITE = 84,
+  PODZOL = 85,
+  MYCELIUM = 86,
+  SOUL_SAND = 87,
+  BASALT = 88,
+  CRYING_OBSIDIAN = 89,
+  SPRUCE_LOG = 90,
+  JUNGLE_LOG = 91,
+  BIRCH_LEAVES = 92,
+  SPRUCE_LEAVES = 93,
+  JUNGLE_LEAVES = 94,
+  LANTERN = 95,
+  RED_MUSHROOM = 96,
+  BROWN_MUSHROOM = 97,
+  BLUE_ORCHID = 98,
+  TERRACOTTA_RED = 99,
+  TERRACOTTA_WHITE = 100,
+  RED_SAND = 101,
 }
 
 export type ItemId =
@@ -68,6 +140,79 @@ export type ItemId =
   | 'poppy'
   | 'dandelion'
   | 'snow'
+  // Real Minecraft Placeable Blocks
+  | 'birch_planks'
+  | 'spruce_planks'
+  | 'stone_bricks'
+  | 'mossy_cobblestone'
+  | 'smooth_stone'
+  | 'sandstone'
+  | 'quartz_block'
+  | 'nether_bricks'
+  | 'glowstone'
+  | 'sea_lantern'
+  | 'redstone_lamp'
+  | 'hay_bale'
+  | 'gold_block'
+  | 'diamond_block'
+  | 'emerald_block'
+  | 'iron_block'
+  | 'lapis_block'
+  | 'pumpkin'
+  | 'melon'
+  | 'terracotta_orange'
+  | 'terracotta_cyan'
+  | 'ice'
+  | 'lava'
+  | 'birch_log'
+  // Extended Blocks
+  | 'jungle_planks'
+  | 'acacia_planks'
+  | 'dark_oak_planks'
+  | 'cracked_stone_bricks'
+  | 'red_sandstone'
+  | 'purpur_block'
+  | 'end_stone'
+  | 'amethyst_block'
+  | 'copper_block'
+  | 'coal_block'
+  | 'redstone_block'
+  | 'slime_block'
+  | 'honey_block'
+  | 'white_wool'
+  | 'red_wool'
+  | 'blue_wool'
+  | 'yellow_wool'
+  | 'green_wool'
+  | 'black_wool'
+  | 'pink_wool'
+  | 'purple_wool'
+  | 'white_concrete'
+  | 'red_concrete'
+  | 'blue_concrete'
+  | 'yellow_concrete'
+  | 'green_concrete'
+  | 'black_concrete'
+  | 'stained_glass_cyan'
+  | 'stained_glass_red'
+  | 'stained_glass_white'
+  | 'podzol'
+  | 'mycelium'
+  | 'soul_sand'
+  | 'basalt'
+  | 'crying_obsidian'
+  | 'spruce_log'
+  | 'jungle_log'
+  | 'birch_leaves'
+  | 'spruce_leaves'
+  | 'jungle_leaves'
+  | 'lantern'
+  | 'red_mushroom'
+  | 'brown_mushroom'
+  | 'blue_orchid'
+  | 'terracotta_red'
+  | 'terracotta_white'
+  | 'red_sand'
   // Tools
   | 'wooden_pickaxe'
   | 'stone_pickaxe'

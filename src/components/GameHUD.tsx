@@ -211,38 +211,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
         {/* Right: Master Build Menu, Advancements & Creative Power Toolbar */}
         <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
-          {/* Celestial Time-of-day Quick Buttons */}
-          <div className="bg-black/60 px-1.5 py-1 rounded border border-white/20 flex items-center gap-1 shadow-md">
-            <button
-              onClick={() => {
-                sounds.playPop();
-                onSetTimeOfDay(0.5); // Noon
-              }}
-              className="px-1.5 py-0.5 hover:bg-yellow-500/40 rounded text-[11px] cursor-pointer"
-              title="Set High Noon (Sunny Day)"
-            >
-              ☀️ Noon
-            </button>
-            <button
-              onClick={() => {
-                sounds.playPop();
-                onSetTimeOfDay(0.75); // Sunset
-              }}
-              className="px-1.5 py-0.5 hover:bg-orange-500/40 rounded text-[11px] cursor-pointer"
-              title="Set Golden Sunset"
-            >
-              🌅 Sunset
-            </button>
-            <button
-              onClick={() => {
-                sounds.playPop();
-                onSetTimeOfDay(0.0); // Midnight
-              }}
-              className="px-1.5 py-0.5 hover:bg-indigo-500/40 rounded text-[11px] cursor-pointer"
-              title="Set Starry Midnight"
-            >
-              🌙 Night
-            </button>
+          {/* Celestial Day Indicator (Night Removed - Perpetual Sunny Day) */}
+          <div className="bg-black/60 px-2.5 py-1 rounded border border-white/20 flex items-center gap-1.5 shadow-md">
+            <span className="text-yellow-400 text-sm">☀️</span>
+            <span className="text-yellow-200 font-bold text-[11px] font-mono tracking-wide">
+              PERPETUAL DAY
+            </span>
           </div>
 
           {/* Flight Mode Toggle & Speed Boost */}

@@ -61,7 +61,7 @@ export class EntityManager {
 
   // Spawn a mob
   public spawnMob(
-    type: 'zombie' | 'skeleton' | 'creeper' | 'pig' | 'cow',
+    type: 'zombie' | 'skeleton' | 'creeper' | 'pig' | 'cow' | 'sheep',
     x: number,
     y: number,
     z: number
@@ -146,6 +146,64 @@ export class EntityManager {
 
       legBR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.45, 0.2), legMat);
       legBR.position.set(0.15, 0.22, -0.15);
+      group.add(legBR);
+    } else if (type === 'sheep') {
+      // Sheep (Passive fluffy mob)
+      maxHealth = 8;
+      const faceMat = new THREE.MeshStandardMaterial({ color: 0xdfcbb5, roughness: 0.8 });
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.42, 0.48), faceMat);
+      head.position.set(0, 0.85, 0.45);
+      group.add(head);
+
+      // Fluffy wool body
+      const woolMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.95 });
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.65, 1.0), woolMat);
+      body.position.set(0, 0.72, 0);
+      group.add(body);
+
+      const legMat = new THREE.MeshStandardMaterial({ color: 0xdfcbb5, roughness: 0.8 });
+      legFL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.45, 0.16), legMat);
+      legFL.position.set(-0.2, 0.22, 0.3);
+      group.add(legFL);
+
+      legFR = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.45, 0.16), legMat);
+      legFR.position.set(0.2, 0.22, 0.3);
+      group.add(legFR);
+
+      legBL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.45, 0.16), legMat);
+      legBL.position.set(-0.2, 0.22, -0.3);
+      group.add(legBL);
+
+      legBR = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.45, 0.16), legMat);
+      legBR.position.set(0.2, 0.22, -0.3);
+      group.add(legBR);
+    } else if (type === 'cow') {
+      // Dairy Cow
+      maxHealth = 10;
+      const cowMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 });
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.5), cowMat);
+      head.position.set(0, 0.9, 0.45);
+      group.add(head);
+
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.75, 1.05), cowMat);
+      body.position.set(0, 0.75, 0);
+      group.add(body);
+
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x33251a, roughness: 0.8 });
+      legFL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.45, 0.18), legMat);
+      legFL.position.set(-0.2, 0.22, 0.32);
+      group.add(legFL);
+
+      legFR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.45, 0.18), legMat);
+      legFR.position.set(0.2, 0.22, 0.32);
+      group.add(legFR);
+
+      legBL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.45, 0.18), legMat);
+      legBL.position.set(-0.2, 0.22, -0.32);
+      group.add(legBL);
+
+      legBR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.45, 0.18), legMat);
+      legBR.position.set(0.2, 0.22, -0.32);
       group.add(legBR);
     } else {
       // Pig (Passive)

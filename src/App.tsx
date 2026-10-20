@@ -757,16 +757,6 @@ export default function App() {
         const isA = !!(keys['KeyA'] || keys['a']);
         const isD = !!(keys['KeyD'] || keys['d']);
 
-        const isSprinting = !!(keys['ControlLeft'] || keys['ControlRight']);
-        const isSneaking = !!(keys['ShiftLeft'] || keys['ShiftRight']);
-        const moveSpeed = isFlying
-          ? (isSprinting ? 18.0 : 11.0) * flySpeedMultiplier
-          : isSprinting
-          ? PhysicsEngine.SPRINT_SPEED
-          : isSneaking
-          ? PhysicsEngine.SNEAK_SPEED
-          : PhysicsEngine.WALK_SPEED;
-
         let moveForward = (isW ? 1 : 0) - (isS ? 1 : 0);
         let moveRight = (isD ? 1 : 0) - (isA ? 1 : 0);
 
@@ -776,13 +766,32 @@ export default function App() {
           moveRight /= len;
         }
 
-        const sinYaw = Math.sin(engine.cameraYaw);
-        const cosYaw = Math.cos(engine.cameraYaw);
+        const isSprinting = !!(keys['ControlLeft'] || keys['ControlRight']);
+        const isSneaking = !!(keys['ShiftLeft'] || keys['ShiftRight']);
+        const moveSpeed = isFlying
+          ? (isSprinting ? 20.0 : 12.0) * flySpeedMultiplier
+          : isSprinting
+          ? PhysicsEngine.SPRINT_SPEED
+          : isSneaking
+          ? PhysicsEngine.SNEAK_SPEED
+          : PhysicsEngine.WALK_SPEED;
 
-        const targetVx = (moveRight * cosYaw - moveForward * sinYaw) * moveSpeed;
-        const targetVz = (moveRight * sinYaw + moveForward * cosYaw) * moveSpeed;
+        // Exact Camera Look Direction Vectors:
+        // Always moves in the exact direction the player is facing!
+        const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const horizForward = new THREE.Vector3(cameraForward.x, 0, cameraForward.z);
+        if (horizForward.lengthSq() > 0.0001) {
+          horizForward.normalize();
+        } else {
+          horizForward.set(-Math.sin(engine.cameraYaw), 0, -Math.cos(engine.cameraYaw)).normalize();
+        }
+        // Right vector is perpendicular to forward on XZ plane
+        const horizRight = new THREE.Vector3(-horizForward.z, 0, horizForward.x);
 
-        const accel = (isFlying ? 20.0 : 14.0) * dt;
+        const targetVx = (horizForward.x * moveForward + horizRight.x * moveRight) * moveSpeed;
+        const targetVz = (horizForward.z * moveForward + horizRight.z * moveRight) * moveSpeed;
+
+        const accel = (isFlying ? 22.0 : 15.0) * dt;
         playerVel.x += (targetVx - playerVel.x) * accel;
         playerVel.z += (targetVz - playerVel.z) * accel;
 
@@ -795,8 +804,12 @@ export default function App() {
         if (isFlying) {
           engine.fallDistance = 0;
           let targetVy = 0;
-          if (keys['Space']) targetVy += 8.5 * flySpeedMultiplier;
-          if (keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyC'] || keys['c']) targetVy -= 8.5 * flySpeedMultiplier;
+          // When flying forward/backward, also glide vertically if looking up/down
+          if (moveForward !== 0 && Math.abs(cameraForward.y) > 0.15) {
+            targetVy += cameraForward.y * moveForward * moveSpeed * 0.75;
+          }
+          if (keys['Space']) targetVy += 9.5 * flySpeedMultiplier;
+          if (keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyC'] || keys['c']) targetVy -= 9.5 * flySpeedMultiplier;
           playerVel.y += (targetVy - playerVel.y) * 16.0 * dt;
         } else if (inWater) {
           playerVel.y -= PhysicsEngine.GRAVITY * 0.3 * dt;
@@ -825,6 +838,7 @@ export default function App() {
         }
 
         // Move entity with physics
+        const preMoveY = playerPos.y;
         const moveRes = PhysicsEngine.moveEntity(world, playerPos, playerVel, 0.3, 1.8, dt, !isFlying);
 
         // Jump
@@ -1538,6 +1552,9 @@ export default function App() {
       {/* 3D WebGL Canvas Container */}
       <div ref={mountRef} className="absolute inset-0 w-full h-full" />
 
+      {/* Authentic Minecraft Vignette Atmosphere Overlay */}
+      <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_center,transparent_55%,rgba(0,0,0,0.38)_100%)]" />
+
       {/* Title Screen */}
       {gameState === 'title' && (
         <TitleScreen
@@ -1550,19 +1567,26 @@ export default function App() {
       {/* Main Playing HUD */}
       {(gameState === 'playing' || gameState === 'paused') && (
         <GameHUD
-          stats={playerStats}
           hotbar={inventory.slice(0, 9)}
           selectedIndex={selectedHotbarIndex}
-          gameMode={gameMode}
           onSelectSlot={(idx) => setSelectedHotbarIndex(idx)}
-          hurtFlash={hurtFlash}
           isFlying={isFlying}
           onToggleFly={() => setIsFlying((f) => !f)}
+          flySpeedMultiplier={flySpeedMultiplier}
+          onToggleFlySpeed={() => setFlySpeedMultiplier((s) => (s >= 3 ? 1 : s + 1))}
           onOpenBuildMenu={() => {
             setActiveModal('build');
             document.exitPointerLock?.();
           }}
+          onOpenAdvancements={() => {
+            setActiveModal('advancements');
+            document.exitPointerLock?.();
+          }}
+          onSetTimeOfDay={handleSetTimeOfDay}
           onTeleportHome={handleTeleportHome}
+          onSaveWaypoint={handleSaveWaypoint}
+          onTeleportWaypoint={handleTeleportWaypoint}
+          hasCustomWaypoint={!!customWaypoint}
           canUndo={buildHistory.length > 0}
           onUndo={handleUndo}
           isLocked={isPointerLocked}
@@ -1587,6 +1611,7 @@ export default function App() {
           }}
           showMobileControls={showMobileControls}
           onToggleMobileControls={() => setShowMobileControls((s) => !s)}
+          recentAdvancement={recentAdvancement}
         />
       )}
 
@@ -1602,6 +1627,8 @@ export default function App() {
             onRotateCamera={handleRotateCamera}
             isFlying={isFlying}
             onToggleFly={() => setIsFlying((f) => !f)}
+            flySpeedMultiplier={flySpeedMultiplier}
+            onToggleFlySpeed={() => setFlySpeedMultiplier((s) => (s >= 3 ? 1 : s + 1))}
             isMounted={!!mountedVehicleState}
             onDismount={() => {
               if (engineRef.current) {
@@ -1615,6 +1642,10 @@ export default function App() {
             }}
             onOpenBuildMenu={() => {
               setActiveModal('build');
+              document.exitPointerLock?.();
+            }}
+            onOpenAdvancements={() => {
+              setActiveModal('advancements');
               document.exitPointerLock?.();
             }}
             canUndo={buildHistory.length > 0}
@@ -1656,9 +1687,19 @@ export default function App() {
         onSelectTool={handleSelectTool}
         onSelectCreativeItem={handleSelectCreativeItem}
         onSpawnDriveableVehicle={handleSpawnDriveableVehicle}
+        onSpawnMob={handleSpawnMob}
         canUndo={buildHistory.length > 0}
         onUndo={handleUndo}
-        currentMode={gameMode}
+      />
+
+      {/* Advancements Trophies Modal */}
+      <AdvancementsModal
+        isOpen={activeModal === 'advancements'}
+        onClose={() => {
+          setActiveModal('none');
+          engineRef.current?.renderer.domElement.requestPointerLock();
+        }}
+        advancements={advancements}
       />
 
       {/* Inventory & 2x2 Crafting Modal */}
@@ -1714,16 +1755,15 @@ export default function App() {
           setGameState('playing');
           engineRef.current?.renderer.domElement.requestPointerLock();
         }}
-        gameMode={gameMode}
-        onToggleGameMode={() =>
-          setGameMode((m) => (m === 'survival' ? 'creative' : 'survival'))
-        }
         isMuted={isMuted}
         onToggleMute={() => {
           const muted = sounds.toggleMute();
           setIsMuted(muted);
         }}
         onSaveWorld={handleSaveWorld}
+        onOpenAdvancements={() => {
+          setActiveModal('advancements');
+        }}
         onQuitToTitle={() => {
           handleSaveWorld();
           setGameState('title');

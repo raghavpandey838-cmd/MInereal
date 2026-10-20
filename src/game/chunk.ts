@@ -149,29 +149,47 @@ export class Chunk {
           if (block === BlockType.AIR) continue;
 
           const isWater = block === BlockType.WATER;
-          const isFoliage = block === BlockType.POPPY || block === BlockType.DANDELION;
+          const isFoliage =
+            block === BlockType.POPPY ||
+            block === BlockType.DANDELION ||
+            block === BlockType.RED_MUSHROOM ||
+            block === BlockType.BROWN_MUSHROOM ||
+            block === BlockType.BLUE_ORCHID;
 
-          // Cross-quad rendering for flowers
+          // Cross-quad rendering for flowers and mushrooms (both diagonals)
           if (isFoliage) {
-            const tileIdx = block === BlockType.POPPY ? 39 : 40;
+            const tileIdx = getTileIndexForFace(block, 'side');
             const [u0, v0, u1, v1] = getTileUV(tileIdx);
+            
             // Diagonal 1
             const p1 = [x, y, z, x + 1, y, z + 1, x + 1, y + 1, z + 1, x, y + 1, z];
-            opaquePositions.push(...p1);
-            for (let i = 0; i < 4; i++) {
+            // Diagonal 2
+            const p2 = [x, y, z + 1, x + 1, y, z, x + 1, y + 1, z, x, y + 1, z + 1];
+
+            opaquePositions.push(...p1, ...p2);
+            for (let i = 0; i < 8; i++) {
               opaqueNormals.push(0, 1, 0);
               opaqueColors.push(1, 1, 1);
             }
-            opaqueUvs.push(u0, v0, u1, v0, u1, v1, u0, v1);
+            opaqueUvs.push(
+              u0, v0, u1, v0, u1, v1, u0, v1,
+              u0, v0, u1, v0, u1, v1, u0, v1
+            );
             opaqueIndices.push(
               opaqueIndexOffset,
               opaqueIndexOffset + 1,
               opaqueIndexOffset + 2,
               opaqueIndexOffset,
               opaqueIndexOffset + 2,
-              opaqueIndexOffset + 3
+              opaqueIndexOffset + 3,
+              opaqueIndexOffset + 4,
+              opaqueIndexOffset + 5,
+              opaqueIndexOffset + 6,
+              opaqueIndexOffset + 4,
+              opaqueIndexOffset + 6,
+              opaqueIndexOffset + 7
             );
-            opaqueIndexOffset += 4;
+            opaqueIndexOffset += 8;
             continue;
           }
 
@@ -194,12 +212,12 @@ export class Chunk {
             const tileIdx = getTileIndexForFace(block, face.faceType);
             const [u0, v0, u1, v1] = getTileUV(tileIdx);
 
-            // Shading multiplier based on normal for extra depth
+            // Shading multiplier based on authentic Minecraft Java directional face lighting
             let shade = 1.0;
-            if (dy > 0) shade = 1.0; // Top
-            else if (dy < 0) shade = 0.5; // Bottom
-            else if (dx !== 0) shade = 0.8; // East/West
-            else shade = 0.7; // North/South
+            if (dy > 0) shade = 1.0; // Top Face (Sunlight)
+            else if (dy < 0) shade = 0.5; // Bottom Face (Under shadow)
+            else if (dz !== 0) shade = 0.8; // North/South Face
+            else shade = 0.6; // East/West Face
 
             if (isWater) {
               for (const [cx, cy, cz] of face.corners) {
