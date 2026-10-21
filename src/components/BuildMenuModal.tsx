@@ -224,21 +224,21 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center pointer-events-auto select-none p-3">
-      <div className="mc-panel p-5 rounded text-[#222] w-[680px] max-w-[96vw] relative flex flex-col max-h-[88vh] shadow-2xl">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center pointer-events-auto select-none p-2 sm:p-3">
+      <div className="mc-panel p-3 sm:p-5 rounded text-[#222] w-[680px] max-w-[98vw] relative flex flex-col max-h-[92vh] sm:max-h-[88vh] shadow-2xl">
         {/* Header */}
-        <div className="flex justify-between items-center mb-3 border-b-2 border-[#888] pb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-3xl">⚒️</span>
+        <div className="flex justify-between items-center mb-2 sm:mb-3 border-b-2 border-[#888] pb-1.5 sm:pb-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-2xl sm:text-3xl">⚒️</span>
             <div>
-              <h2 className="font-bold text-lg text-[#111] leading-tight flex items-center gap-2">
-                Creative Master Builder Studio
-                <span className="text-[10px] bg-yellow-500 text-black px-2 py-0.5 rounded font-mono font-bold">
-                  CREATIVE ONLY
+              <h2 className="font-bold text-sm sm:text-lg text-[#111] leading-tight flex items-center gap-1.5">
+                Creative Studio
+                <span className="text-[9px] sm:text-[10px] bg-yellow-500 text-black px-1.5 py-0.5 rounded font-mono font-bold">
+                  CREATIVE
                 </span>
               </h2>
-              <span className="text-[11px] text-[#555]">
-                Instant Blueprints, Driveable Vehicles, WorldEdit Supertools, Mob Spawner & Infinite Palette
+              <span className="text-[10px] sm:text-[11px] text-[#555] hidden sm:inline">
+                Instant Blueprints, Vehicles, WorldEdit Supertools, Mobs & Palette
               </span>
             </div>
           </div>
@@ -247,7 +247,7 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
               sounds.playPop();
               onClose();
             }}
-            className="w-8 h-8 bg-[#a53b3b] text-white border-2 border-[#551111] hover:bg-[#c24646] font-bold text-sm cursor-pointer"
+            className="w-7 h-7 sm:w-8 sm:h-8 bg-[#a53b3b] text-white border-2 border-[#551111] hover:bg-[#c24646] font-bold text-sm cursor-pointer rounded flex items-center justify-center shrink-0 active:scale-95"
           >
             ✕
           </button>

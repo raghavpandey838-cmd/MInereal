@@ -47,8 +47,17 @@ interface HistoryStep {
   newType: BlockType;
 }
 
+const isTouchDevice = typeof window !== 'undefined' && (
+  'ontouchstart' in window ||
+  (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) ||
+  window.matchMedia?.('(pointer: coarse)').matches
+);
+
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
+
+  // Touch device and interaction tracking
+  const isTouchActive = useRef<boolean>(isTouchDevice);
 
   // Touch look-around refs for mobile
   const lookTouchId = useRef<number | null>(null);
@@ -268,22 +277,35 @@ export default function App() {
       torchLights: [],
     };
 
-    // Resize Handler
+    // Resize Handler with VisualViewport and DPR support for flawless mobile and desktop resolution
     const handleResize = () => {
       if (!engineRef.current) return;
       const { camera, renderer } = engineRef.current;
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(width, height);
     };
     window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
 
     // Pointer Lock Listener
     const handlePointerLockChange = () => {
       const isLocked = document.pointerLockElement === renderer.domElement;
       setIsPointerLocked(isLocked);
+      // Only auto-pause on desktop with mouse when pointer lock was released while playing
+      // NEVER auto-pause on mobile or touch devices!
       if (!isLocked) {
-        setGameState((curr) => (curr === 'playing' ? 'paused' : curr));
+        if (!isTouchDevice && !isTouchActive.current) {
+          setGameState((curr) => (curr === 'playing' ? 'paused' : curr));
+        }
+      } else {
+        setGameState('playing');
       }
     };
     document.addEventListener('pointerlockchange', handlePointerLockChange);
@@ -299,7 +321,11 @@ export default function App() {
     // Clean up
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('pointerlockchange', handlePointerLockChange);
+      window.removeEventListener('orientationchange', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+      }
+      document.removeEventListener('pointerlockchange', handlePointerLockChange);
       window.removeEventListener('blur', handleWindowBlur);
       sounds.stopAmbientMusic();
       world.dispose();
@@ -659,6 +685,44 @@ export default function App() {
       return newInv;
     });
   };
+
+  // Safely close any open modal and immediately resume playing without getting trapped in pause
+  const handleCloseModal = useCallback(() => {
+    setActiveModal('none');
+    setGameState('playing');
+    if (!isTouchDevice && !isTouchActive.current && engineRef.current?.renderer?.domElement) {
+      try {
+        engineRef.current.renderer.domElement.requestPointerLock?.();
+      } catch {
+        // ignore pointer lock rejection
+      }
+    }
+  }, []);
+
+  // Safely resume gameplay from pause menu
+  const handleResumeGame = useCallback(() => {
+    setGameState('playing');
+    setActiveModal('none');
+    if (!isTouchDevice && !isTouchActive.current && engineRef.current?.renderer?.domElement) {
+      try {
+        engineRef.current.renderer.domElement.requestPointerLock?.();
+      } catch {
+        // ignore pointer lock rejection
+      }
+    }
+  }, []);
+
+  // Explicit pause game handler (called from Escape on desktop or ⏸️ on mobile)
+  const handlePauseGame = useCallback(() => {
+    setGameState('paused');
+    if (document.pointerLockElement) {
+      try {
+        document.exitPointerLock?.();
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
 
   // Main Render & Game Loop
   useEffect(() => {
@@ -1264,9 +1328,13 @@ export default function App() {
     const engine = engineRef.current;
     if (!engine) return;
 
-    // Lock pointer on first click if desktop
-    if (document.pointerLockElement !== engine.renderer.domElement) {
-      engine.renderer.domElement.requestPointerLock?.();
+    // Lock pointer on first click if desktop with mouse
+    if (!isTouchDevice && !isTouchActive.current && document.pointerLockElement !== engine.renderer.domElement) {
+      try {
+        engine.renderer.domElement.requestPointerLock?.();
+      } catch {
+        // ignore
+      }
       if (gameState === 'title') {
         setGameState('playing');
       }
@@ -1306,6 +1374,7 @@ export default function App() {
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    isTouchActive.current = true;
     const target = e.target as HTMLElement;
     if (target.closest('button, [data-interactive], input, select, textarea')) {
       return;
@@ -1451,8 +1520,7 @@ export default function App() {
           setActiveModal('inventory');
           document.exitPointerLock?.();
         } else if (activeModal !== 'none') {
-          setActiveModal('none');
-          engine.renderer.domElement.requestPointerLock();
+          handleCloseModal();
         }
         return;
       }
@@ -1460,13 +1528,11 @@ export default function App() {
       // Escape Menu Toggle
       if (code === 'Escape') {
         if (activeModal !== 'none') {
-          setActiveModal('none');
-          engine.renderer.domElement.requestPointerLock();
+          handleCloseModal();
         } else if (gameState === 'playing') {
-          setGameState('paused');
+          handlePauseGame();
         } else if (gameState === 'paused') {
-          setGameState('playing');
-          engine.renderer.domElement.requestPointerLock();
+          handleResumeGame();
         }
         return;
       }
@@ -1627,17 +1693,24 @@ export default function App() {
           }}
           onOpenInventory={() => {
             setActiveModal('inventory');
-            document.exitPointerLock?.();
+            if (document.pointerLockElement) {
+              document.exitPointerLock?.();
+            }
           }}
           showMobileControls={showMobileControls}
           onToggleMobileControls={() => setShowMobileControls((s) => !s)}
           recentAdvancement={recentAdvancement}
           onSpawnVehicle={handleSpawnDriveableVehicle}
+          onPauseGame={handlePauseGame}
+          playerStats={playerStats}
+          onMineStart={handleMineStart}
+          onMineStop={handleMineStop}
+          onInteract={handleInteract}
         />
       )}
 
       {/* On-Screen Mobile Navigation Keys & Action Cluster */}
-      {(gameState === 'playing' || gameState === 'paused') &&
+      {gameState === 'playing' &&
         showMobileControls &&
         activeModal === 'none' && (
           <MobileControls
@@ -1659,15 +1732,21 @@ export default function App() {
             }}
             onOpenInventory={() => {
               setActiveModal('inventory');
-              document.exitPointerLock?.();
+              if (document.pointerLockElement) {
+                document.exitPointerLock?.();
+              }
             }}
             onOpenBuildMenu={() => {
               setActiveModal('build');
-              document.exitPointerLock?.();
+              if (document.pointerLockElement) {
+                document.exitPointerLock?.();
+              }
             }}
             onOpenAdvancements={() => {
               setActiveModal('advancements');
-              document.exitPointerLock?.();
+              if (document.pointerLockElement) {
+                document.exitPointerLock?.();
+              }
             }}
             canUndo={buildHistory.length > 0}
             onUndo={handleUndo}
@@ -1700,10 +1779,7 @@ export default function App() {
       {/* Master Builder Modal (Blueprints, Vehicles, Multi-Tools & Infinite Block Palette) */}
       <BuildMenuModal
         isOpen={activeModal === 'build'}
-        onClose={() => {
-          setActiveModal('none');
-          engineRef.current?.renderer.domElement.requestPointerLock();
-        }}
+        onClose={handleCloseModal}
         onSelectStructure={handleSelectStructure}
         onSelectTool={handleSelectTool}
         onSelectCreativeItem={handleSelectCreativeItem}
@@ -1716,20 +1792,14 @@ export default function App() {
       {/* Advancements Trophies Modal */}
       <AdvancementsModal
         isOpen={activeModal === 'advancements'}
-        onClose={() => {
-          setActiveModal('none');
-          engineRef.current?.renderer.domElement.requestPointerLock();
-        }}
+        onClose={handleCloseModal}
         advancements={advancements}
       />
 
       {/* Inventory & 2x2 Crafting Modal */}
       <InventoryModal
         isOpen={activeModal === 'inventory'}
-        onClose={() => {
-          setActiveModal('none');
-          engineRef.current?.renderer.domElement.requestPointerLock();
-        }}
+        onClose={handleCloseModal}
         inventory={inventory}
         onUpdateInventory={setInventory}
       />
@@ -1737,10 +1807,7 @@ export default function App() {
       {/* 3x3 Crafting Table Modal */}
       <CraftingTableModal
         isOpen={activeModal === 'crafting'}
-        onClose={() => {
-          setActiveModal('none');
-          engineRef.current?.renderer.domElement.requestPointerLock();
-        }}
+        onClose={handleCloseModal}
         inventory={inventory}
         onUpdateInventory={setInventory}
       />
@@ -1748,10 +1815,7 @@ export default function App() {
       {/* Furnace Smelting Modal */}
       <FurnaceModal
         isOpen={activeModal === 'furnace'}
-        onClose={() => {
-          setActiveModal('none');
-          engineRef.current?.renderer.domElement.requestPointerLock();
-        }}
+        onClose={handleCloseModal}
         inventory={inventory}
         onUpdateInventory={setInventory}
       />
@@ -1759,10 +1823,7 @@ export default function App() {
       {/* Chest Storage Modal */}
       <ChestModal
         isOpen={activeModal === 'chest'}
-        onClose={() => {
-          setActiveModal('none');
-          engineRef.current?.renderer.domElement.requestPointerLock();
-        }}
+        onClose={handleCloseModal}
         inventory={inventory}
         onUpdateInventory={setInventory}
         chestSlots={chestSlots}
@@ -1772,10 +1833,7 @@ export default function App() {
       {/* Pause Menu */}
       <PauseMenu
         isOpen={gameState === 'paused' && activeModal === 'none'}
-        onResume={() => {
-          setGameState('playing');
-          engineRef.current?.renderer.domElement.requestPointerLock();
-        }}
+        onResume={handleResumeGame}
         isMuted={isMuted}
         onToggleMute={() => {
           const muted = sounds.toggleMute();

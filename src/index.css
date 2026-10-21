@@ -59,6 +59,13 @@
   position: relative;
 }
 
+@media (max-width: 640px) {
+  .mc-slot {
+    width: 33px;
+    height: 33px;
+  }
+}
+
 .mc-slot.selected {
   outline: 3px solid #ffffff;
   outline-offset: -1px;

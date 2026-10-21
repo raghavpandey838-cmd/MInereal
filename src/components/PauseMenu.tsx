@@ -37,9 +37,13 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
         {/* Back to Game */}
         <button
           onClick={onResume}
-          className="mc-btn w-full py-2.5 font-bold text-sm cursor-pointer shadow-lg bg-[#3b6ea5]"
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            onResume();
+          }}
+          className="mc-btn w-full py-3 font-bold text-base cursor-pointer shadow-xl bg-[#3b6ea5] hover:bg-[#4b80bd] active:scale-95 text-white"
         >
-          Back to Game
+          ▶ Back to Game
         </button>
 
         {/* Advancements Button */}
