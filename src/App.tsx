@@ -213,23 +213,26 @@ export default function App() {
     // 5. Vehicles Manager (Car, Bike, Boat)
     const vehicles = new VehicleManager(scene);
 
-    // Spawn starter vehicles: Offroader Car and Motorcycle near spawn, Rowboat near water!
-    const spawnY = world.findHighestSolidY(0, 0) + 1;
-    vehicles.spawnVehicle('car', 4, spawnY, 4, 0);
-    vehicles.spawnVehicle('bike', -4, spawnY, 4, Math.PI / 4);
-    vehicles.spawnVehicle('boat', 18, 24, 18, 0);
+    // Guaranteed dry land landing area
+    const safeSpawn = world.findSafeDryLandSpawn(0, 0);
+    const spawnY = safeSpawn.y;
 
-    // Starter mobs
-    entities.spawnMob('pig', 6, world.findHighestSolidY(6, 6) + 1, 6);
-    entities.spawnMob('pig', -8, world.findHighestSolidY(-8, 6) + 1, 6);
-    entities.spawnMob('zombie', 16, world.findHighestSolidY(16, 16) + 1, 16);
-    entities.spawnMob('creeper', -12, world.findHighestSolidY(-12, -10) + 1, -10);
+    // Spawn starter vehicles on dry land: Offroader Car and Motorcycle near spawn, Rowboat in nearby water
+    vehicles.spawnVehicle('car', safeSpawn.x + 3, spawnY + 1, safeSpawn.z + 3, 0);
+    vehicles.spawnVehicle('bike', safeSpawn.x - 3, spawnY + 1, safeSpawn.z + 3, Math.PI / 4);
+    vehicles.spawnVehicle('boat', safeSpawn.x + 15, 24, safeSpawn.z + 15, 0);
+
+    // Starter mobs on dry land
+    entities.spawnMob('pig', safeSpawn.x + 4, spawnY + 1, safeSpawn.z + 2);
+    entities.spawnMob('pig', safeSpawn.x - 4, spawnY + 1, safeSpawn.z + 3);
+    entities.spawnMob('zombie', safeSpawn.x + 14, world.findHighestSolidY(safeSpawn.x + 14, safeSpawn.z + 14) + 1, safeSpawn.z + 14);
+    entities.spawnMob('creeper', safeSpawn.x - 12, world.findHighestSolidY(safeSpawn.x - 12, safeSpawn.z - 10) + 1, safeSpawn.z - 10);
 
     // 6. Hand Renderer & Block Highlighter
     const hand = new HandRenderer(camera);
     const highlighter = new BlockHighlightManager(scene, world.opaqueMaterial.map as THREE.CanvasTexture);
 
-    const playerPos = new THREE.Vector3(0.5, spawnY + 1.5, 0.5);
+    const playerPos = new THREE.Vector3(safeSpawn.x + 0.5, spawnY + 1.6, safeSpawn.z + 0.5);
     const playerVel = new THREE.Vector3(0, 0, 0);
 
     camera.position.set(playerPos.x, playerPos.y + 1.62, playerPos.z);
@@ -368,12 +371,12 @@ export default function App() {
     }
   };
 
-  // Teleport Home / Spawn
+  // Teleport Home / Guaranteed Dry Land Spawn
   const handleTeleportHome = () => {
     const engine = engineRef.current;
     if (!engine) return;
-    const spawnY = engine.world.findHighestSolidY(0, 0) + 2;
-    engine.playerPos.set(0.5, spawnY, 0.5);
+    const safeSpawn = engine.world.findSafeDryLandSpawn(0, 0);
+    engine.playerPos.set(safeSpawn.x + 0.5, safeSpawn.y + 1.6, safeSpawn.z + 0.5);
     engine.playerVel.set(0, 0, 0);
     sounds.playLevelUp();
   };
@@ -1076,7 +1079,7 @@ export default function App() {
 
     const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion);
 
-    // Check if hitting any mob first
+    // 1. Check if hitting any mob first
     for (let i = 0; i < engine.entities.mobs.length; i++) {
       const mob = engine.entities.mobs[i];
       const dist = Math.hypot(
@@ -1095,11 +1098,28 @@ export default function App() {
         const dot = forwardDir.dot(toMob);
         if (dot > 0.85) {
           const held = inventory[selectedHotbarIndex];
-          const damage = (held && ITEM_ATTACK_DAMAGE[held.id]) || 2;
+          const damage = (held && ITEM_ATTACK_DAMAGE[held.id]) || 4;
           engine.entities.damageMob(i, damage, forwardDir);
           engine.isMining = false;
           return;
         }
+      }
+    }
+
+    // 2. Creative Mode: Instant 1-Click Break on targeted block
+    if (gameMode === 'creative') {
+      const hit = engine.world.raycast(engine.camera.position, forwardDir, 6.0);
+      if (hit.hit && hit.block !== BlockType.BEDROCK && hit.block !== BlockType.AIR) {
+        const oldType = hit.block;
+        engine.world.setBlock(hit.x, hit.y, hit.z, BlockType.AIR);
+        engine.world.rebuildDirtyChunks();
+        sounds.playBlockBreak(hit.block);
+        engine.entities.spawnParticleBurst(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, '#888888', 12);
+        setBuildHistory((prev) => [
+          ...prev.slice(-49),
+          [{ x: hit.x, y: hit.y, z: hit.z, oldType, newType: BlockType.AIR }],
+        ]);
+        engine.highlighter.setCrackStage(0, 0, 0, 0);
       }
     }
   };
@@ -1528,8 +1548,8 @@ export default function App() {
     engine.world.modifiedBlocks.clear();
     engine.world.generateInitialWorld(0, 0);
 
-    const spawnY = engine.world.findHighestSolidY(0, 0) + 2;
-    engine.playerPos.set(0.5, spawnY, 0.5);
+    const safeSpawn = engine.world.findSafeDryLandSpawn(0, 0);
+    engine.playerPos.set(safeSpawn.x + 0.5, safeSpawn.y + 1.6, safeSpawn.z + 0.5);
     engine.playerVel.set(0, 0, 0);
 
     setGameState('playing');
@@ -1612,6 +1632,7 @@ export default function App() {
           showMobileControls={showMobileControls}
           onToggleMobileControls={() => setShowMobileControls((s) => !s)}
           recentAdvancement={recentAdvancement}
+          onSpawnVehicle={handleSpawnDriveableVehicle}
         />
       )}
 

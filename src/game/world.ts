@@ -399,6 +399,78 @@ export class VoxelWorld {
     return 0;
   }
 
+  /**
+   * Finds a guaranteed dry, solid land coordinate for player spawn.
+   * Performs an outward spiral search to avoid water bodies, rivers, and oceans.
+   * Builds a clean 5x5 dry grass landing pad so the landing area is 100% solid and safe.
+   */
+  public findSafeDryLandSpawn(preferredX: number = 0, preferredZ: number = 0): { x: number; y: number; z: number } {
+    let bestX = preferredX;
+    let bestZ = preferredZ;
+    let bestY = 28;
+    let found = false;
+
+    // Outward spiral search up to radius 48 blocks
+    for (let r = 0; r <= 48 && !found; r += 2) {
+      for (let dx = -r; dx <= r && !found; dx += 2) {
+        for (let dz = -r; dz <= r && !found; dz += 2) {
+          if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+          const wx = preferredX + dx;
+          const wz = preferredZ + dz;
+
+          // Check if this column has water
+          let hasWater = false;
+          for (let y = SEA_LEVEL + 2; y >= SEA_LEVEL - 2; y--) {
+            if (this.getBlock(wx, y, wz) === BlockType.WATER) {
+              hasWater = true;
+              break;
+            }
+          }
+          if (hasWater) continue;
+
+          // Find top solid ground block
+          const topY = this.findHighestSolidY(wx, wz);
+          if (topY > SEA_LEVEL) {
+            const above1 = this.getBlock(wx, topY + 1, wz);
+            const above2 = this.getBlock(wx, topY + 2, wz);
+            if (
+              (above1 === BlockType.AIR || above1 === BlockType.POPPY || above1 === BlockType.DANDELION) &&
+              above2 === BlockType.AIR
+            ) {
+              bestX = wx;
+              bestZ = wz;
+              bestY = topY;
+              found = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Ensure the landing area is a pristine 5x5 dry land pad at minimum height 26 (strictly above sea level 24)
+    const landingY = Math.max(bestY, 26);
+    for (let ox = -2; ox <= 2; ox++) {
+      for (let oz = -2; oz <= 2; oz++) {
+        const lx = bestX + ox;
+        const lz = bestZ + oz;
+        // Surface grass
+        this.setBlock(lx, landingY, lz, BlockType.GRASS);
+        // Subsurface dirt foundation
+        this.setBlock(lx, landingY - 1, lz, BlockType.DIRT);
+        this.setBlock(lx, landingY - 2, lz, BlockType.DIRT);
+        this.setBlock(lx, landingY - 3, lz, BlockType.STONE);
+        // Clear air space above for player head room
+        this.setBlock(lx, landingY + 1, lz, BlockType.AIR);
+        this.setBlock(lx, landingY + 2, lz, BlockType.AIR);
+        this.setBlock(lx, landingY + 3, lz, BlockType.AIR);
+      }
+    }
+    this.rebuildDirtyChunks();
+
+    return { x: bestX, y: landingY, z: bestZ };
+  }
+
   public rebuildDirtyChunks() {
     this.chunks.forEach((chunk) => {
       if (chunk.isDirty) {

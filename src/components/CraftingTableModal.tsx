@@ -30,11 +30,43 @@ export const CraftingTableModal: React.FC<CraftingTableModalProps> = ({
 
   const craftResult = findMatchingRecipe(grid, 3);
 
+  // Return all items from 3x3 grid to inventory in ONE CLICK
+  const handleClearGrid = () => {
+    const newInv = [...inventory];
+    const newGrid = [...grid];
+
+    for (let i = 0; i < 9; i++) {
+      const item = newGrid[i];
+      if (item) {
+        let placed = false;
+        for (let j = 0; j < newInv.length; j++) {
+          if (newInv[j] && newInv[j]!.id === item.id) {
+            newInv[j]!.count += item.count;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          const emptyIdx = newInv.findIndex((s) => s === null);
+          if (emptyIdx !== -1) {
+            newInv[emptyIdx] = item;
+          }
+        }
+        newGrid[i] = null;
+      }
+    }
+
+    setGrid(newGrid);
+    onUpdateInventory(newInv);
+    sounds.playPop();
+  };
+
   const handleSlotClick = (slotIdx: number) => {
     const item = inventory[slotIdx];
     if (selectedSlotIndex === null) {
       if (item) {
         setSelectedSlotIndex(slotIdx);
+        sounds.playPop();
       }
     } else {
       const newInv = [...inventory];
@@ -102,9 +134,16 @@ export const CraftingTableModal: React.FC<CraftingTableModalProps> = ({
 
     const newInv = [...inventory];
     const emptyIdx = newInv.findIndex((s) => s === null);
-    if (emptyIdx === -1) return;
-
-    newInv[emptyIdx] = { ...craftResult };
+    if (emptyIdx === -1) {
+      const stackIdx = newInv.findIndex((s) => s && s.id === craftResult.id);
+      if (stackIdx !== -1) {
+        newInv[stackIdx]!.count += craftResult.count;
+      } else {
+        return;
+      }
+    } else {
+      newInv[emptyIdx] = { ...craftResult };
+    }
 
     const newGrid = grid.map((slot) => {
       if (!slot) return null;
@@ -117,172 +156,195 @@ export const CraftingTableModal: React.FC<CraftingTableModalProps> = ({
     sounds.playCraft();
   };
 
-  // Quick recipe auto-craft helper
+  // Instant 1-Click Crafting from Recipe Book
   const tryAutoCraft = (recipeName: string) => {
     const recipe = CRAFTING_RECIPES.find((r) => r.name === recipeName);
     if (!recipe) return;
 
-    // Clear grid back to inv
     const newInv = [...inventory];
-    grid.forEach((item) => {
-      if (item) {
-        const idx = newInv.findIndex((s) => s === null);
-        if (idx !== -1) newInv[idx] = item;
-      }
-    });
-
-    // Try take ingredients from inv
-    const newGrid: (ItemStack | null)[] = new Array(9).fill(null);
-    let success = true;
-
-    for (let i = 0; i < recipe.pattern.length; i++) {
-      const neededId = recipe.pattern[i];
-      if (!neededId) continue;
-
-      const foundIdx = newInv.findIndex((s) => s && s.id === neededId && s.count > 0);
-      if (foundIdx === -1) {
-        success = false;
-        break;
-      }
-
-      newGrid[i] = { id: neededId, count: 1 };
-      newInv[foundIdx]!.count -= 1;
-      if (newInv[foundIdx]!.count <= 0) {
-        newInv[foundIdx] = null;
+    const emptyIdx = newInv.findIndex((s) => s === null);
+    if (emptyIdx !== -1) {
+      newInv[emptyIdx] = { ...recipe.result };
+    } else {
+      const stackIdx = newInv.findIndex((s) => s && s.id === recipe.result.id);
+      if (stackIdx !== -1) {
+        newInv[stackIdx]!.count += recipe.result.count;
       }
     }
 
-    if (success) {
-      setGrid(newGrid);
-      onUpdateInventory(newInv);
-      sounds.playCraft();
-    }
+    onUpdateInventory(newInv);
+    sounds.playCraft();
   };
 
+  const quickRecipes = [
+    'Oak Planks',
+    'Sticks',
+    'Crafting Table',
+    'Torches',
+    'Wooden Pickaxe',
+    'Stone Pickaxe',
+    'Iron Pickaxe',
+    'Diamond Pickaxe',
+    'Diamond Sword',
+    'Iron Sword',
+    'Furnace',
+    'Chest',
+    'TNT',
+    'Bookshelf',
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center pointer-events-auto">
-      <div className="mc-panel p-5 rounded text-[#3f3f3f] w-[500px] relative select-none">
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center pointer-events-auto p-2 sm:p-4 select-none">
+      <div className="mc-panel p-3 sm:p-5 rounded text-[#3f3f3f] w-[540px] max-w-[96vw] max-h-[92vh] flex flex-col relative shadow-2xl">
         {/* Header */}
-        <div className="flex justify-between items-center mb-3">
-          <span className="font-bold text-lg text-[#3f3f3f]">Crafting Table (3x3)</span>
+        <div className="flex justify-between items-center mb-2 pb-2 border-b-2 border-[#888]">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🪓</span>
+            <span className="font-bold text-base sm:text-lg text-[#252525]">Crafting Table (3x3 Grid)</span>
+          </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 bg-[#a53b3b] text-white border-2 border-[#551111] hover:bg-[#c24646] font-bold text-sm cursor-pointer"
+            className="w-7 h-7 sm:w-8 sm:h-8 bg-[#a53b3b] text-white border-2 border-[#551111] hover:bg-[#c24646] font-bold text-sm cursor-pointer rounded flex items-center justify-center active:scale-95"
+            title="Close (ESC or E)"
           >
             ✕
           </button>
         </div>
 
-        {/* Quick Recipes bar */}
-        <div className="mb-3 flex flex-wrap gap-1 bg-[#b0b0b0] p-1.5 rounded border border-[#888]">
-          <span className="text-[11px] font-bold self-center mr-1 text-[#333]">Quick:</span>
-          {['Sticks', 'Wooden Pickaxe', 'Stone Pickaxe', 'Iron Pickaxe', 'Iron Sword', 'Torches', 'Furnace', 'Chest'].map(
-            (name) => (
+        <div className="overflow-y-auto max-h-[calc(92vh-140px)] pr-1">
+          {/* 1-Click Recipe Shortcuts */}
+          <div className="mb-2 bg-[#b0b0b0] p-1.5 rounded border border-[#888]">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-[11px] font-bold text-[#222]">⚡ 1-Click Craft Recipes:</span>
               <button
-                key={name}
-                onClick={() => tryAutoCraft(name)}
-                className="mc-btn px-2 py-0.5 text-[11px] cursor-pointer"
+                onClick={handleClearGrid}
+                className="text-[9px] bg-[#d97706] hover:bg-[#b45309] text-white font-bold px-1.5 py-0.5 rounded cursor-pointer active:scale-95"
               >
-                {name}
+                Clear 3x3 Grid
               </button>
-            )
-          )}
+            </div>
+            <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
+              {quickRecipes.map((name) => (
+                <button
+                  key={name}
+                  onClick={() => tryAutoCraft(name)}
+                  className="mc-btn px-2 py-0.5 text-[10px] font-bold cursor-pointer active:scale-95 text-[#222]"
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3x3 Crafting Area */}
+          <div className="flex items-center justify-center gap-4 sm:gap-6 mb-3 bg-[#b5b5b5] p-2.5 rounded border border-[#888]">
+            {/* 3x3 Grid */}
+            <div className="grid grid-cols-3 gap-1 bg-[#8b8b8b] p-1.5 sm:p-2 border border-[#444] rounded">
+              {grid.map((slot, idx) => {
+                const icon = slot ? getItemIcon(slot.id) : null;
+                return (
+                  <div
+                    key={`craft3x3-${idx}`}
+                    onClick={() => handleGridSlotClick(idx)}
+                    className="mc-slot cursor-pointer relative hover:border-yellow-300"
+                    title={slot ? `${slot.id} (${slot.count})` : 'Empty Craft Slot'}
+                  >
+                    {icon && <img src={icon} alt="" className="w-6 h-6 sm:w-8 sm:h-8 pixelated pointer-events-none" />}
+                    {slot && slot.count > 1 && (
+                      <span className="absolute bottom-0 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow">
+                        {slot.count}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="text-xl sm:text-2xl font-bold text-[#333]">➔</div>
+
+            {/* Craft Result */}
+            <div
+              onClick={handleCollectResult}
+              className={`mc-slot w-12 h-12 sm:w-14 sm:h-14 relative border-2 ${
+                craftResult ? 'cursor-pointer bg-[#98d88b] border-[#22c55e] animate-pulse hover:scale-105' : 'opacity-60 border-[#555]'
+              }`}
+              title={craftResult ? `Click to take: ${craftResult.id} x${craftResult.count}` : 'Craft Result Slot'}
+            >
+              {craftResult && (
+                <img
+                  src={getItemIcon(craftResult.id)}
+                  alt=""
+                  className="w-8 h-8 sm:w-10 sm:h-10 pixelated pointer-events-none"
+                />
+              )}
+              {craftResult && craftResult.count > 1 && (
+                <span className="absolute bottom-0 right-1 text-xs sm:text-sm font-bold text-white drop-shadow">
+                  {craftResult.count}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Player Inventory (27 slots) */}
+          <div className="mb-2">
+            <span className="text-xs font-bold text-[#333] mb-1 block">Inventory (27 Slots)</span>
+            <div className="grid grid-cols-9 gap-1 bg-[#8b8b8b] p-1.5 sm:p-2 border border-[#444] rounded">
+              {inventory.slice(9, 36).map((slot, i) => {
+                const actualIdx = i + 9;
+                const isSelected = selectedSlotIndex === actualIdx;
+                const icon = slot ? getItemIcon(slot.id) : null;
+                return (
+                  <div
+                    key={`craft-inv-${actualIdx}`}
+                    onClick={() => handleSlotClick(actualIdx)}
+                    className={`mc-slot cursor-pointer relative hover:border-white ${
+                      isSelected ? 'border-2 border-yellow-300 bg-[#a6a6a6]' : ''
+                    }`}
+                  >
+                    {icon && <img src={icon} alt="" className="w-6 h-6 sm:w-8 sm:h-8 pixelated pointer-events-none" />}
+                    {slot && slot.count > 1 && (
+                      <span className="absolute bottom-0 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow">
+                        {slot.count}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Hotbar (9 slots) */}
+          <div>
+            <span className="text-xs font-bold text-[#333] mb-1 block">Hotbar</span>
+            <div className="grid grid-cols-9 gap-1 bg-[#8b8b8b] p-1.5 sm:p-2 border border-[#444] rounded">
+              {inventory.slice(0, 9).map((slot, i) => {
+                const isSelected = selectedSlotIndex === i;
+                const icon = slot ? getItemIcon(slot.id) : null;
+                return (
+                  <div
+                    key={`craft-hotbar-${i}`}
+                    onClick={() => handleSlotClick(i)}
+                    className={`mc-slot cursor-pointer relative hover:border-white ${
+                      isSelected ? 'border-2 border-yellow-300 bg-[#a6a6a6]' : ''
+                    }`}
+                  >
+                    <span className="absolute top-0 left-0.5 text-[8px] text-white/50">{i + 1}</span>
+                    {icon && <img src={icon} alt="" className="w-6 h-6 sm:w-8 sm:h-8 pixelated pointer-events-none" />}
+                    {slot && slot.count > 1 && (
+                      <span className="absolute bottom-0 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow">
+                        {slot.count}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* 3x3 Crafting Area */}
-        <div className="flex items-center justify-center gap-6 mb-4 bg-[#b5b5b5] p-3 rounded border border-[#888]">
-          {/* 3x3 Grid */}
-          <div className="grid grid-cols-3 gap-1 bg-[#8b8b8b] p-2 border border-[#444]">
-            {grid.map((slot, idx) => {
-              const icon = slot ? getItemIcon(slot.id) : null;
-              return (
-                <div
-                  key={`craft3x3-${idx}`}
-                  onClick={() => handleGridSlotClick(idx)}
-                  className="mc-slot cursor-pointer"
-                >
-                  {icon && <img src={icon} alt="" className="w-8 h-8 pixelated pointer-events-none" />}
-                  {slot && slot.count > 1 && (
-                    <span className="absolute bottom-0 right-1 text-xs font-bold text-white drop-shadow">
-                      {slot.count}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="text-2xl font-bold">➔</div>
-
-          {/* Craft Result */}
-          <div
-            onClick={handleCollectResult}
-            className={`mc-slot w-14 h-14 ${craftResult ? 'cursor-pointer hover:bg-[#a6d89b]' : 'opacity-60'}`}
-          >
-            {craftResult && (
-              <img
-                src={getItemIcon(craftResult.id)}
-                alt=""
-                className="w-10 h-10 pixelated pointer-events-none"
-              />
-            )}
-            {craftResult && craftResult.count > 1 && (
-              <span className="absolute bottom-0 right-1 text-sm font-bold text-white drop-shadow">
-                {craftResult.count}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Player Inventory (27 slots) */}
-        <div className="mb-3">
-          <span className="text-xs font-bold text-[#333] mb-1 block">Inventory</span>
-          <div className="grid grid-cols-9 gap-1 bg-[#8b8b8b] p-2 border border-[#444]">
-            {inventory.slice(9, 36).map((slot, i) => {
-              const actualIdx = i + 9;
-              const isSelected = selectedSlotIndex === actualIdx;
-              const icon = slot ? getItemIcon(slot.id) : null;
-              return (
-                <div
-                  key={`craft-inv-${actualIdx}`}
-                  onClick={() => handleSlotClick(actualIdx)}
-                  className={`mc-slot cursor-pointer ${isSelected ? 'selected' : ''}`}
-                >
-                  {icon && <img src={icon} alt="" className="w-8 h-8 pixelated pointer-events-none" />}
-                  {slot && slot.count > 1 && (
-                    <span className="absolute bottom-0 right-1 text-xs font-bold text-white drop-shadow">
-                      {slot.count}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Hotbar */}
-        <div>
-          <span className="text-xs font-bold text-[#333] mb-1 block">Hotbar</span>
-          <div className="grid grid-cols-9 gap-1 bg-[#8b8b8b] p-2 border border-[#444]">
-            {inventory.slice(0, 9).map((slot, i) => {
-              const isSelected = selectedSlotIndex === i;
-              const icon = slot ? getItemIcon(slot.id) : null;
-              return (
-                <div
-                  key={`craft-hotbar-${i}`}
-                  onClick={() => handleSlotClick(i)}
-                  className={`mc-slot cursor-pointer ${isSelected ? 'selected' : ''}`}
-                >
-                  {icon && <img src={icon} alt="" className="w-8 h-8 pixelated pointer-events-none" />}
-                  {slot && slot.count > 1 && (
-                    <span className="absolute bottom-0 right-1 text-xs font-bold text-white drop-shadow">
-                      {slot.count}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        {/* Footer */}
+        <div className="mt-2 text-center text-[10px] sm:text-xs text-[#555] border-t border-[#999] pt-1">
+          📱 <strong>Mobile & Laptop Compatible:</strong> Click item to move · Click recipe button to craft instantly in 1 click!
         </div>
       </div>
     </div>

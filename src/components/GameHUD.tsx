@@ -37,6 +37,7 @@ interface GameHUDProps {
   showMobileControls: boolean;
   onToggleMobileControls: () => void;
   recentAdvancement: { title: string; description: string; icon: string } | null;
+  onSpawnVehicle?: (type: 'car' | 'bike' | 'boat') => void;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -68,6 +69,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   showMobileControls,
   onToggleMobileControls,
   recentAdvancement,
+  onSpawnVehicle,
 }) => {
   return (
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden flex flex-col justify-between">
@@ -211,6 +213,43 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
         {/* Right: Master Build Menu, Advancements & Creative Power Toolbar */}
         <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
+          {/* 1-Click Vehicle Spawner Cluster */}
+          {onSpawnVehicle && (
+            <div className="bg-black/60 p-0.5 rounded border border-white/20 flex items-center gap-1 shadow-md">
+              <span className="text-[10px] text-yellow-300 font-bold px-1 hidden md:inline">1-Click:</span>
+              <button
+                onClick={() => {
+                  sounds.playPop();
+                  onSpawnVehicle('car');
+                }}
+                className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer hover:scale-105 active:scale-95"
+                title="1-Click Spawn Offroader Car in front of you"
+              >
+                🏎️ Car
+              </button>
+              <button
+                onClick={() => {
+                  sounds.playPop();
+                  onSpawnVehicle('bike');
+                }}
+                className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer hover:scale-105 active:scale-95"
+                title="1-Click Spawn Motorcycle in front of you"
+              >
+                🏍️ Bike
+              </button>
+              <button
+                onClick={() => {
+                  sounds.playPop();
+                  onSpawnVehicle('boat');
+                }}
+                className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer hover:scale-105 active:scale-95"
+                title="1-Click Spawn Rowboat in Water"
+              >
+                🚣 Boat
+              </button>
+            </div>
+          )}
+
           {/* Celestial Day Indicator (Night Removed - Perpetual Sunny Day) */}
           <div className="bg-black/60 px-2.5 py-1 rounded border border-white/20 flex items-center gap-1.5 shadow-md">
             <span className="text-yellow-400 text-sm">☀️</span>
