@@ -201,11 +201,6 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               Exit
             </button>
           </div>
-        ) : !isLocked ? (
-          <div className="hidden md:flex bg-black/75 text-white px-3 py-1 rounded border border-white/20 font-bold text-xs shadow-lg pointer-events-none items-center gap-2">
-            <span className="text-yellow-400">Desktop:</span>
-            <span>Click canvas to lock mouse look</span>
-          </div>
         ) : null}
 
         {/* Right: Clean Action Bar */}
@@ -380,33 +375,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
       </div>
 
-      {/* Subtle Desktop-Only Turn Assistance Buttons (Hidden on mobile to keep touch surface clear) */}
-      <div className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 pointer-events-auto z-10 opacity-70 hover:opacity-100 transition-opacity">
-        <button
-          onClick={() => {
-            sounds.playPop();
-            onRotateCamera(0.4);
-          }}
-          className="mc-btn w-9 h-12 flex items-center justify-center font-bold text-sm shadow-md"
-          title="Turn Left (← or A)"
-        >
-          ◀
-        </button>
-      </div>
-      <div className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 pointer-events-auto z-10 opacity-70 hover:opacity-100 transition-opacity">
-        <button
-          onClick={() => {
-            sounds.playPop();
-            onRotateCamera(-0.4);
-          }}
-          className="mc-btn w-9 h-12 flex items-center justify-center font-bold text-sm shadow-md"
-          title="Turn Right (→ or D)"
-        >
-          ▶
-        </button>
-      </div>
-
-      {/* Bottom HUD: Authentic Minecraft Bottom Interface with Hearts, Hunger, XP Bar, Hotbar & 1-Click Actions */}
+      {/* Bottom HUD: Authentic Minecraft Bottom Interface with Hearts, Hunger, XP Bar & Blocks Hotbar Only */}
       <div
         className={`fixed bottom-1 md:bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center z-20 max-w-[98vw] transition-transform ${
           guiScale === 'compact' ? 'scale-85 sm:scale-95 md:scale-100 origin-bottom' : 'scale-100 origin-bottom'
@@ -416,47 +385,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         {selectedItem && (
           <div className="mb-0.5 sm:mb-1 text-center font-bold text-[10px] sm:text-xs text-yellow-300 bg-black/85 px-2.5 py-0.5 rounded-full border border-white/20 shadow-md drop-shadow backdrop-blur-xs flex items-center gap-1 animate-fade-in">
             <span>{getItemDisplayName(selectedItem.id)}</span>
-            <span className="text-[9px] text-gray-400 hidden sm:inline">
-              · [Left-Click: Mine · Right-Click: Place]
-            </span>
           </div>
         )}
 
-        {/* Health Hearts, Level Badge & Hunger Drumsticks (Authentic Minecraft HUD) */}
-        <div className="w-full flex items-center justify-between max-w-[270px] sm:max-w-[340px] mb-0.5 sm:mb-1 px-1">
-          {/* Health Hearts (10 Hearts) */}
-          <div className="flex items-center gap-0.5" title="Player Health (20 HP)">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <span key={`heart-${i}`} className="text-red-500 text-[10px] sm:text-xs drop-shadow leading-none select-none">
-                {i * 2 + 1 < (playerStats?.health ?? 20) ? '❤️' : '💔'}
-              </span>
-            ))}
-          </div>
 
-          {/* Level Number */}
-          <div
-            className="text-[#55ff55] font-bold text-[10px] sm:text-xs font-mono drop-shadow-[1px_1px_0px_#000] px-1 bg-black/60 rounded border border-green-500/30"
-            title="Experience Level"
-          >
-            {playerStats?.level ?? 1}
-          </div>
 
-          {/* Hunger Drumsticks (10 Drumsticks) */}
-          <div className="flex items-center gap-0.5" title="Hunger / Food Meter">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <span key={`hunger-${i}`} className="text-amber-500 text-[10px] sm:text-xs drop-shadow leading-none select-none">
-                🍗
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Green XP Experience Bar */}
-        <div className="w-full max-w-[270px] sm:max-w-[340px] h-1 bg-black/80 rounded-full border border-black overflow-hidden mb-0.5 sm:mb-1 shadow-inner">
-          <div className="h-full bg-gradient-to-r from-lime-500 via-green-400 to-lime-300 w-full animate-pulse" />
-        </div>
-
-        {/* 9-Slot Authentic Hotbar (Single-Click Responsive, Compact on Mobile) */}
+        {/* 9-Slot Authentic Blocks Hotbar (Clean - No clutter below) */}
         <div className="flex bg-[#8f8f8f] p-0.5 border-t-2 border-l-2 border-[#dbdbdb] border-r-2 border-b-2 border-[#2b2b2b] shadow-2xl rounded-xs max-w-full overflow-x-auto">
           {hotbar.map((slot, index) => {
             const isSelected = selectedIndex === index;
@@ -497,108 +431,6 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               </button>
             );
           })}
-        </div>
-
-        {/* Laptop-Only 1-Click Action Toolbar (Hidden on Mobile Phone screens to keep world view clear) */}
-        <div className="hidden md:flex mt-1 items-center justify-center gap-1 flex-wrap pointer-events-auto">
-          {onMineStart && (
-            <button
-              onClick={() => {
-                onMineStart();
-                setTimeout(() => onMineStop?.(), 120);
-              }}
-              className="mc-btn px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-red-200 border-red-500/60 bg-red-950/60 hover:bg-red-900/80 cursor-pointer flex items-center gap-1 active:scale-95 shadow"
-              title="1-Click Instant Break Block (or Left Click)"
-            >
-              <span>⛏️</span>
-              <span>Mine</span>
-            </button>
-          )}
-
-          {onInteract && (
-            <button
-              onClick={() => onInteract()}
-              className="mc-btn px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-green-200 border-green-500/60 bg-green-950/60 hover:bg-green-900/80 cursor-pointer flex items-center gap-1 active:scale-95 shadow"
-              title="1-Click Place Held Item (or Right Click)"
-            >
-              <span>🧱</span>
-              <span>Place</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => {
-              sounds.playPop();
-              onToggleFly();
-            }}
-            className={`mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer flex items-center gap-1 active:scale-95 shadow ${
-              isFlying ? 'bg-cyan-700 text-cyan-100 border-cyan-400' : ''
-            }`}
-            title="Toggle Flight Mode [F]"
-          >
-            <span>🕊️</span>
-            <span>{isFlying ? 'Fly: ON' : 'Fly: OFF'}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              sounds.playPop();
-              onOpenBuildMenu();
-            }}
-            className="mc-btn px-2 py-1 text-[11px] font-bold text-yellow-200 border-yellow-500/80 bg-blue-900/70 hover:bg-blue-800 cursor-pointer flex items-center gap-1 active:scale-95 shadow"
-            title="Open Master Build Studio [B]"
-          >
-            <span>⚒️</span>
-            <span>Build [B]</span>
-          </button>
-
-          <button
-            onClick={() => {
-              sounds.playPop();
-              onOpenInventory();
-            }}
-            className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer flex items-center gap-1 active:scale-95 shadow"
-            title="Open Bag / Inventory [E]"
-          >
-            <span>🎒</span>
-            <span>Bag [E]</span>
-          </button>
-
-          <button
-            onClick={() => {
-              sounds.playPop();
-              onUndo();
-            }}
-            disabled={!canUndo}
-            className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer flex items-center gap-1 disabled:opacity-40 active:scale-95 shadow"
-            title="Undo last placed structure or block (Z)"
-          >
-            <span>↩</span>
-            <span>Undo [Z]</span>
-          </button>
-
-          <button
-            onClick={() => {
-              sounds.playPop();
-              onTeleportHome();
-            }}
-            className="mc-btn px-2 py-1 text-[11px] font-bold cursor-pointer flex items-center gap-1 active:scale-95 shadow"
-            title="Teleport to World Spawn (0, Y, 0)"
-          >
-            <span>🏠</span>
-            <span>Spawn</span>
-          </button>
-        </div>
-
-        {/* Creative Badge Strip with Keyboard Shortcuts Hint */}
-        <div className="hidden md:flex items-center gap-2 mt-1 font-mono text-[10px] bg-black/60 px-3 py-0.5 rounded-full border border-white/20 text-yellow-300 drop-shadow">
-          <span>⭐ CREATIVE MODE</span>
-          <span className="text-white/40">|</span>
-          <span className="text-green-300">Infinite Blocks</span>
-          <span className="text-white/40">|</span>
-          <span className="text-cyan-300">1-Click Instant Break</span>
-          <span className="text-white/40">|</span>
-          <span className="text-purple-300">Slots: 1..9</span>
         </div>
       </div>
     </div>

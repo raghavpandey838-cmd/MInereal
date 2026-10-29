@@ -167,6 +167,8 @@ export default function App() {
     frameCount: number;
     lastFpsUpdate: number;
     torchLights: THREE.PointLight[];
+    lastUiUpdate: number;
+    lastChunkCheck: number;
   } | null>(null);
 
   // Check saved game in localStorage
@@ -198,14 +200,20 @@ export default function App() {
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 600);
     scene.add(camera);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    // Anti-Lag WebGL Renderer: mediump precision, high-performance power preference, optimized PCF shadows
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance',
+      precision: 'mediump',
+      stencil: false,
+    });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.38;
+    renderer.toneMappingExposure = 1.35;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap; // Anti-Lag: PCFShadowMap runs 2-3x faster than PCFSoft
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); // Anti-Lag: 1.5 cap stops mobile GPU throttling
 
     mountRef.current.appendChild(renderer.domElement);
 
@@ -277,6 +285,8 @@ export default function App() {
       frameCount: 0,
       lastFpsUpdate: performance.now(),
       torchLights: [],
+      lastUiUpdate: 0,
+      lastChunkCheck: 0,
     };
 
     // Resize Handler with VisualViewport and DPR support for flawless mobile and desktop resolution
@@ -287,7 +297,7 @@ export default function App() {
       const height = window.innerHeight;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); // Anti-Lag cap
       renderer.setSize(width, height);
     };
     window.addEventListener('resize', handleResize);
@@ -785,8 +795,11 @@ export default function App() {
       // 1. Day / Night cycle
       sky.update(dt, playerPos);
 
-      // 2. Dynamic Wide Map Streaming: stream chunks around player as they explore
-      world.updateChunksAroundPlayer(playerPos.x, playerPos.z);
+      // 2. Dynamic Wide Map Streaming: stream chunks around player (Anti-Lag: checked every 250ms)
+      if (time - (engine.lastChunkCheck || 0) > 250) {
+        engine.lastChunkCheck = time;
+        world.updateChunksAroundPlayer(playerPos.x, playerPos.z);
+      }
 
       // 3. Update Vehicles Physics & Driving
       vehicles.updateVehicles(world, dt, keys, (wx, wy, wz) => {
@@ -800,7 +813,9 @@ export default function App() {
       // 5. Check if Player is Mounted on a Vehicle
       const mounted = vehicles.mountedVehicle;
       if (mounted) {
-        setMountedVehicleState({ type: mounted.entity.type, speed: mounted.entity.speed });
+        if (time - (engine.lastUiUpdate || 0) > 120) {
+          setMountedVehicleState({ type: mounted.entity.type, speed: mounted.entity.speed });
+        }
         // Lock player position to vehicle seat
         const seatYOffset = mounted.entity.type === 'bike' ? 0.75 : 0.45;
         playerPos.set(mounted.entity.x, mounted.entity.y + seatYOffset, mounted.entity.z);
@@ -811,10 +826,10 @@ export default function App() {
         camera.rotation.order = 'YXZ';
         camera.rotation.y = engine.cameraYaw;
         camera.rotation.x = engine.cameraPitch;
-
-        setPlayerCoords({ x: playerPos.x, y: playerPos.y, z: playerPos.z });
       } else {
-        setMountedVehicleState(null);
+        if (mountedVehicleState !== null) {
+          setMountedVehicleState(null);
+        }
 
         // Standard On-Foot / Flying Movement:
         // Key W: moves forward EVERY TIME
@@ -947,20 +962,24 @@ export default function App() {
         camera.rotation.y = engine.cameraYaw;
         camera.rotation.x = engine.cameraPitch;
 
-        setPlayerCoords({ x: playerPos.x, y: playerPos.y, z: playerPos.z });
       }
 
-      // Compass calculation
-      const deg = ((-engine.cameraYaw * 180) / Math.PI + 360) % 360;
-      let heading = 'N';
-      if (deg >= 22.5 && deg < 67.5) heading = 'NE';
-      else if (deg >= 67.5 && deg < 112.5) heading = 'E';
-      else if (deg >= 112.5 && deg < 157.5) heading = 'SE';
-      else if (deg >= 157.5 && deg < 202.5) heading = 'S';
-      else if (deg >= 202.5 && deg < 247.5) heading = 'SW';
-      else if (deg >= 247.5 && deg < 292.5) heading = 'W';
-      else if (deg >= 292.5 && deg < 337.5) heading = 'NW';
-      setCompassHeading(`${heading} (${Math.round(deg)}°)`);
+      // Anti-Lag: Throttle React UI State updates (coordinates & compass) to 8Hz instead of 60-120Hz
+      if (time - (engine.lastUiUpdate || 0) > 120) {
+        engine.lastUiUpdate = time;
+        setPlayerCoords({ x: playerPos.x, y: playerPos.y, z: playerPos.z });
+
+        const deg = ((-engine.cameraYaw * 180) / Math.PI + 360) % 360;
+        let heading = 'N';
+        if (deg >= 22.5 && deg < 67.5) heading = 'NE';
+        else if (deg >= 67.5 && deg < 112.5) heading = 'E';
+        else if (deg >= 112.5 && deg < 157.5) heading = 'SE';
+        else if (deg >= 157.5 && deg < 202.5) heading = 'S';
+        else if (deg >= 202.5 && deg < 247.5) heading = 'SW';
+        else if (deg >= 247.5 && deg < 292.5) heading = 'W';
+        else if (deg >= 292.5 && deg < 337.5) heading = 'NW';
+        setCompassHeading(`${heading} (${Math.round(deg)}°)`);
+      }
 
       // 6. Update Hand / Tool Model
       const isMoving = Math.hypot(playerVel.x, playerVel.z) > 0.5;

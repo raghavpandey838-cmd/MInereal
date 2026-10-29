@@ -843,8 +843,11 @@ export class EntityManager {
     }
   }
 
-  // Particle System
+  // Particle System (Anti-Lag: capped & only updates GPU when particles exist)
   public spawnParticleBurst(x: number, y: number, z: number, colorHex: string, count: number = 8) {
+    if (this.particles.length > 180) {
+      this.particles.splice(0, count);
+    }
     for (let i = 0; i < count; i++) {
       this.particles.push({
         x: x + (Math.random() - 0.5) * 0.4,
@@ -863,6 +866,14 @@ export class EntityManager {
 
   public updateParticles(dt: number) {
     if (!this.particlePoints) return;
+
+    if (this.particles.length === 0) {
+      if (this.particlePoints.visible) {
+        this.particlePoints.visible = false;
+      }
+      return;
+    }
+    this.particlePoints.visible = true;
 
     const positions = this.particlePoints.geometry.attributes.position.array as Float32Array;
     const colors = this.particlePoints.geometry.attributes.color.array as Float32Array;
