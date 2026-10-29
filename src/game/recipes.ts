@@ -25,6 +25,7 @@ export const SMELTING_RECIPES: SmeltingRecipe[] = [
   { input: 'cobblestone', output: 'stone', cookTime: 6 },
   { input: 'raw_porkchop', output: 'cooked_porkchop', cookTime: 6 },
   { input: 'raw_beef', output: 'cooked_beef', cookTime: 6 },
+  { input: 'raw_chicken', output: 'cooked_chicken', cookTime: 6 },
 ];
 
 export const FUEL_VALUES: Partial<Record<ItemId, number>> = {

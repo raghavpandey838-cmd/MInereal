@@ -31,6 +31,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [quickMoveActive, setQuickMoveActive] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -44,10 +45,9 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     for (let i = 0; i < 4; i++) {
       const item = newGrid[i];
       if (item) {
-        // Try to stack or put in first empty slot
         let placed = false;
         for (let j = 0; j < newInv.length; j++) {
-          if (newInv[j] && newInv[j]!.id === item.id) {
+          if (newInv[j] && newInv[j]!.id === item.id && newInv[j]!.count + item.count <= 64) {
             newInv[j]!.count += item.count;
             placed = true;
             break;
@@ -68,8 +68,107 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     sounds.playPop();
   };
 
+  // Quick Move / Shift-Click between Hotbar (0..8) and Main Inventory (9..35)
+  const handleQuickMove = (slotIdx: number) => {
+    const item = inventory[slotIdx];
+    if (!item) return;
+
+    const newInv = [...inventory];
+    const isHotbar = slotIdx < 9;
+    const targetRange = isHotbar ? { start: 9, end: 36 } : { start: 0, end: 9 };
+
+    let remaining = item.count;
+    // 1. Try stacking into existing non-full stacks
+    for (let i = targetRange.start; i < targetRange.end; i++) {
+      if (newInv[i] && newInv[i]!.id === item.id && newInv[i]!.count < 64) {
+        const space = 64 - newInv[i]!.count;
+        const add = Math.min(space, remaining);
+        newInv[i]!.count += add;
+        remaining -= add;
+        if (remaining <= 0) break;
+      }
+    }
+
+    // 2. Put remainder into first empty slot in target range
+    if (remaining > 0) {
+      for (let i = targetRange.start; i < targetRange.end; i++) {
+        if (!newInv[i]) {
+          newInv[i] = { ...item, count: remaining };
+          remaining = 0;
+          break;
+        }
+      }
+    }
+
+    if (remaining <= 0) {
+      newInv[slotIdx] = null;
+    } else {
+      newInv[slotIdx] = { ...item, count: remaining };
+    }
+
+    if (selectedSlotIndex === slotIdx) setSelectedSlotIndex(null);
+    onUpdateInventory(newInv);
+    sounds.playPop();
+  };
+
+  // Auto-Stack & Compact Inventory
+  const handleAutoStack = () => {
+    const newInv = [...inventory];
+    for (let i = 0; i < 36; i++) {
+      if (!newInv[i]) continue;
+      for (let j = i + 1; j < 36; j++) {
+        if (newInv[j] && newInv[j]!.id === newInv[i]!.id) {
+          const space = 64 - newInv[i]!.count;
+          if (space > 0) {
+            const transfer = Math.min(space, newInv[j]!.count);
+            newInv[i]!.count += transfer;
+            newInv[j]!.count -= transfer;
+            if (newInv[j]!.count <= 0) {
+              newInv[j] = null;
+            }
+          }
+        }
+      }
+    }
+    onUpdateInventory(newInv);
+    sounds.playCraft();
+  };
+
+  // Split stack in half
+  const handleSplitStack = (slotIdx: number) => {
+    const item = inventory[slotIdx];
+    if (!item || item.count <= 1) return;
+
+    const newInv = [...inventory];
+    const half = Math.floor(item.count / 2);
+    item.count -= half;
+
+    const emptyIdx = newInv.findIndex((s, i) => s === null && i !== slotIdx);
+    if (emptyIdx !== -1) {
+      newInv[emptyIdx] = { ...item, count: half };
+      onUpdateInventory(newInv);
+      sounds.playPop();
+    }
+  };
+
+  // Trash / Drop selected item
+  const handleTrashSlot = () => {
+    if (selectedSlotIndex === null) return;
+    const newInv = [...inventory];
+    newInv[selectedSlotIndex] = null;
+    setSelectedSlotIndex(null);
+    onUpdateInventory(newInv);
+    sounds.playPop();
+  };
+
   // Transfer item from inventory to crafting grid or vice versa
-  const handleSlotClick = (slotIdx: number) => {
+  const handleSlotClick = (slotIdx: number, e?: React.MouseEvent) => {
+    // If Shift is pressed or Quick Move mode is active, do instant transfer
+    if (e?.shiftKey || quickMoveActive) {
+      handleQuickMove(slotIdx);
+      return;
+    }
+
     const item = inventory[slotIdx];
     if (selectedSlotIndex === null) {
       if (item) {
@@ -77,15 +176,18 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
         sounds.playPop();
       }
     } else {
-      // Swap or combine
       const newInv = [...inventory];
       const source = newInv[selectedSlotIndex];
       const target = newInv[slotIdx];
 
       if (source && target && source.id === target.id) {
-        // Stack together
-        target.count += source.count;
-        newInv[selectedSlotIndex] = null;
+        const space = 64 - target.count;
+        const add = Math.min(space, source.count);
+        target.count += add;
+        source.count -= add;
+        if (source.count <= 0) {
+          newInv[selectedSlotIndex] = null;
+        }
       } else {
         newInv[slotIdx] = source;
         newInv[selectedSlotIndex] = target;
@@ -95,6 +197,47 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
       setSelectedSlotIndex(null);
       sounds.playPop();
     }
+  };
+
+  // Craft All / Max batches possible from 2x2 grid
+  const handleCraftMax = () => {
+    let result = findMatchingRecipe(craftGrid, 2);
+    if (!result) return;
+
+    const newInv = [...inventory];
+    const newGrid = [...craftGrid];
+
+    while (result) {
+      let placed = false;
+      for (let i = 0; i < newInv.length; i++) {
+        if (newInv[i] && newInv[i]!.id === result.id && newInv[i]!.count + result.count <= 64) {
+          newInv[i]!.count += result.count;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        const emptyIdx = newInv.findIndex((s) => s === null);
+        if (emptyIdx !== -1) {
+          newInv[emptyIdx] = { ...result };
+          placed = true;
+        }
+      }
+      if (!placed) break; // Inventory full
+
+      // Decrement each slot
+      for (let g = 0; g < 4; g++) {
+        if (newGrid[g]) {
+          newGrid[g]!.count -= 1;
+          if (newGrid[g]!.count <= 0) newGrid[g] = null;
+        }
+      }
+      result = findMatchingRecipe(newGrid, 2);
+    }
+
+    setCraftGrid(newGrid);
+    onUpdateInventory(newInv);
+    sounds.playCraft();
   };
 
   // Quick One-Click Crafting directly from Recipe Book
@@ -292,20 +435,46 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
         <div className="overflow-y-auto max-h-[calc(92vh-160px)] pr-1">
           {activeTab === 'crafting' && (
             <div>
-              {/* Top: 2x2 Crafting Area & Player Preview */}
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3 bg-[#b5b5b5] p-2.5 rounded border border-[#888]">
-                {/* Character Profile */}
-                <div className="flex items-center gap-2">
-                  <div className="w-14 h-24 sm:w-16 sm:h-28 bg-[#999999] border-2 border-[#555] rounded flex flex-col items-center justify-center text-xs text-white/80 p-1 shadow-inner">
-                    <span className="text-2xl mb-1">🧑</span>
-                    <span className="font-bold text-[10px] text-center">Raghav's Avatar</span>
+              {/* Top: 2x2 Crafting Area & Player Preview with Armor Slots */}
+              <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-3 bg-[#b5b5b5] p-2.5 rounded border border-[#888]">
+                {/* 4 Armor Slots + Character Profile + Offhand */}
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  {/* Vertical Armor Slots */}
+                  <div className="flex flex-col gap-1">
+                    <div className="mc-slot w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#8b8b8b] border border-[#555] rounded text-xs" title="Helmet (Armor Slot)">
+                      <span>🪖</span>
+                    </div>
+                    <div className="mc-slot w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#8b8b8b] border border-[#555] rounded text-xs" title="Chestplate (Armor Slot)">
+                      <span>🦺</span>
+                    </div>
+                    <div className="mc-slot w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#8b8b8b] border border-[#555] rounded text-xs" title="Leggings (Armor Slot)">
+                      <span>👖</span>
+                    </div>
+                    <div className="mc-slot w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#8b8b8b] border border-[#555] rounded text-xs" title="Boots (Armor Slot)">
+                      <span>🥾</span>
+                    </div>
+                  </div>
+
+                  {/* Character Avatar Box */}
+                  <div className="w-14 h-32 sm:w-16 sm:h-34 bg-[#999999] border-2 border-[#555] rounded flex flex-col items-center justify-center text-xs text-white/80 p-1 shadow-inner relative">
+                    <span className="text-3xl mb-1">🧑</span>
+                    <span className="font-bold text-[9px] text-center leading-tight">Steve / Raghav</span>
+                    <span className="text-[8px] text-green-300 font-bold mt-1">❤ 20/20</span>
+                  </div>
+
+                  {/* Shield / Offhand Slot */}
+                  <div className="flex flex-col justify-end h-32 sm:h-34 pb-1">
+                    <div className="mc-slot w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#8b8b8b] border border-[#555] rounded text-xs" title="Shield / Off-hand Slot (F key)">
+                      <span>🛡️</span>
+                    </div>
+                    <span className="text-[8px] text-[#444] font-bold text-center mt-0.5">Off-hand</span>
                   </div>
                 </div>
 
                 {/* 2x2 Crafting Grid */}
                 <div className="flex flex-col items-center">
                   <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-[#222]">Crafting (2x2 Grid)</span>
+                    <span className="text-xs font-bold text-[#222]">Crafting (2x2)</span>
                     <button
                       onClick={handleClearCraftGrid}
                       className="text-[10px] bg-[#d97706] hover:bg-[#b45309] text-white font-bold px-1.5 py-0.5 rounded cursor-pointer shadow active:scale-95"
@@ -341,27 +510,38 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                     {/* Arrow */}
                     <div className="text-xl sm:text-2xl font-bold text-[#333]">➔</div>
 
-                    {/* Craft Result Slot */}
-                    <div
-                      onClick={handleCollectCraftResult}
-                      className={`mc-slot relative border-2 ${
-                        craftResult
-                          ? 'cursor-pointer bg-[#98d88b] border-[#22c55e] animate-pulse hover:scale-105'
-                          : 'opacity-60 border-[#555]'
-                      }`}
-                      title={craftResult ? `Click to Craft: ${craftResult.id} x${craftResult.count}` : 'Craft Result Slot'}
-                    >
+                    {/* Craft Result Slot & Craft Max Button */}
+                    <div className="flex flex-col items-center gap-1">
+                      <div
+                        onClick={handleCollectCraftResult}
+                        className={`mc-slot relative border-2 ${
+                          craftResult
+                            ? 'cursor-pointer bg-[#98d88b] border-[#22c55e] animate-pulse hover:scale-105'
+                            : 'opacity-60 border-[#555]'
+                        }`}
+                        title={craftResult ? `Click to Craft: ${craftResult.id} x${craftResult.count}` : 'Craft Result Slot'}
+                      >
+                        {craftResult && (
+                          <img
+                            src={getItemIcon(craftResult.id)}
+                            alt=""
+                            className="w-7 h-7 sm:w-8 sm:h-8 pixelated pointer-events-none"
+                          />
+                        )}
+                        {craftResult && craftResult.count > 1 && (
+                          <span className="absolute bottom-0 right-1 text-xs font-bold text-white drop-shadow">
+                            {craftResult.count}
+                          </span>
+                        )}
+                      </div>
                       {craftResult && (
-                        <img
-                          src={getItemIcon(craftResult.id)}
-                          alt=""
-                          className="w-7 h-7 sm:w-8 sm:h-8 pixelated pointer-events-none"
-                        />
-                      )}
-                      {craftResult && craftResult.count > 1 && (
-                        <span className="absolute bottom-0 right-1 text-xs font-bold text-white drop-shadow">
-                          {craftResult.count}
-                        </span>
+                        <button
+                          onClick={handleCraftMax}
+                          className="text-[9px] bg-[#22c55e] hover:bg-[#16a34a] text-black font-black px-1.5 py-0.5 rounded shadow cursor-pointer uppercase active:scale-95"
+                          title="Craft all possible batches at once"
+                        >
+                          ⚡ Craft Max
+                        </button>
                       )}
                     </div>
                   </div>
@@ -506,12 +686,59 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
             </div>
           )}
 
-          {/* Main Inventory: 27 slots (rows 0-2) */}
+          {/* Main Inventory: 27 slots (rows 0-2) with Action Controls */}
           <div className="mb-2 sm:mb-3">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs font-bold text-[#333]">Survival Inventory (27 Slots)</span>
-              <span className="text-[10px] text-[#555]">Click to select/swap items</span>
+            <div className="flex flex-wrap justify-between items-center mb-1 gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-[#333]">Survival Inventory (27 Slots)</span>
+                {selectedSlotIndex !== null && (
+                  <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300">
+                    Slot {selectedSlotIndex + 1} Selected
+                  </span>
+                )}
+              </div>
+
+              {/* Minecraft Inventory Utility Buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setQuickMoveActive(!quickMoveActive)}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer border transition-colors shadow-xs ${
+                    quickMoveActive
+                      ? 'bg-[#22c55e] text-black border-[#15803d] animate-pulse font-black'
+                      : 'bg-[#9ca3af] hover:bg-[#d1d5db] text-black border-[#4b5563]'
+                  }`}
+                  title="Shift-Click / Quick Move items between Hotbar and 27-slot Inventory"
+                >
+                  ⚡ Quick Move {quickMoveActive ? 'ON' : 'OFF'}
+                </button>
+                <button
+                  onClick={handleAutoStack}
+                  className="text-[10px] bg-[#d97706] hover:bg-[#b45309] text-white font-bold px-2 py-0.5 rounded cursor-pointer border border-[#92400e] shadow-xs active:scale-95"
+                  title="Consolidate and stack identical items together"
+                >
+                  📦 Auto-Stack
+                </button>
+                {selectedSlotIndex !== null && (
+                  <>
+                    <button
+                      onClick={() => handleSplitStack(selectedSlotIndex)}
+                      className="text-[10px] bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold px-1.5 py-0.5 rounded cursor-pointer border border-[#1e40af] shadow-xs active:scale-95"
+                      title="Split selected stack into half (also Right-Click slot)"
+                    >
+                      ½ Split
+                    </button>
+                    <button
+                      onClick={handleTrashSlot}
+                      className="text-[10px] bg-[#dc2626] hover:bg-[#b91c1c] text-white font-bold px-1.5 py-0.5 rounded cursor-pointer border border-[#991b1b] shadow-xs active:scale-95"
+                      title="Discard / Trash selected item"
+                    >
+                      🗑️ Drop
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
+
             <div className="grid grid-cols-9 gap-1 bg-[#8b8b8b] p-1.5 sm:p-2 border border-[#444] rounded">
               {inventory.slice(9, 36).map((slot, i) => {
                 const actualIdx = i + 9;
@@ -520,15 +747,19 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                 return (
                   <div
                     key={`inv-${actualIdx}`}
-                    onClick={() => handleSlotClick(actualIdx)}
-                    className={`mc-slot cursor-pointer relative hover:border-white ${
+                    onClick={(e) => handleSlotClick(actualIdx, e)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      handleSplitStack(actualIdx);
+                    }}
+                    className={`mc-slot cursor-pointer relative hover:border-white select-none ${
                       isSelected ? 'border-2 border-yellow-300 bg-[#a6a6a6]' : ''
                     }`}
-                    title={slot ? `${slot.id} (${slot.count})` : 'Empty Slot'}
+                    title={slot ? `${slot.id} (${slot.count}) - Shift/Click to quick-move, Right-Click to split` : 'Empty Slot'}
                   >
                     {icon && <img src={icon} alt="" className="w-6 h-6 sm:w-8 sm:h-8 pixelated pointer-events-none" />}
                     {slot && slot.count > 1 && (
-                      <span className="absolute bottom-0 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow">
+                      <span className="absolute bottom-0 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow pointer-events-none">
                         {slot.count}
                       </span>
                     )}
@@ -542,7 +773,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
           <div>
             <div className="flex justify-between items-center mb-1">
               <span className="text-xs font-bold text-[#333]">Hotbar (Keys 1–9)</span>
-              <span className="text-[10px] text-yellow-700 font-bold">Equipped on screen</span>
+              <span className="text-[10px] text-yellow-800 font-bold">Equipped on main screen</span>
             </div>
             <div className="grid grid-cols-9 gap-1 bg-[#8b8b8b] p-1.5 sm:p-2 border border-[#444] rounded">
               {inventory.slice(0, 9).map((slot, i) => {
@@ -551,16 +782,20 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                 return (
                   <div
                     key={`hotbar-inv-${i}`}
-                    onClick={() => handleSlotClick(i)}
-                    className={`mc-slot cursor-pointer relative hover:border-white ${
+                    onClick={(e) => handleSlotClick(i, e)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      handleSplitStack(i);
+                    }}
+                    className={`mc-slot cursor-pointer relative hover:border-white select-none ${
                       isSelected ? 'border-2 border-yellow-300 bg-[#a6a6a6]' : ''
                     }`}
-                    title={slot ? `${slot.id} (${slot.count})` : `Hotbar Slot ${i + 1}`}
+                    title={slot ? `${slot.id} (${slot.count}) - Shift/Click to quick-move, Right-Click to split` : `Hotbar Slot ${i + 1}`}
                   >
                     <span className="absolute top-0 left-0.5 text-[8px] text-white/50">{i + 1}</span>
                     {icon && <img src={icon} alt="" className="w-6 h-6 sm:w-8 sm:h-8 pixelated pointer-events-none" />}
                     {slot && slot.count > 1 && (
-                      <span className="absolute bottom-0 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow">
+                      <span className="absolute bottom-0 right-1 text-[10px] sm:text-xs font-bold text-white drop-shadow pointer-events-none">
                         {slot.count}
                       </span>
                     )}
@@ -572,8 +807,10 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
         </div>
 
         {/* Footer Hint */}
-        <div className="mt-2 text-center text-[10px] sm:text-xs text-[#555] border-t border-[#999] pt-1">
-          📱 <strong>Mobile & Laptop Compatible:</strong> Click item to pick up & swap · Click ⚡ to craft instantly · Press <kbd className="px-1 bg-white border border-[#888] rounded">E</kbd> or <kbd className="px-1 bg-white border border-[#888] rounded">ESC</kbd> to close
+        <div className="mt-2 text-center text-[10px] sm:text-xs text-[#555] border-t border-[#999] pt-1 flex justify-between items-center px-1">
+          <span>⚡ <strong>Quick-Move:</strong> Shift-Click slot or toggle Quick Move</span>
+          <span>½ <strong>Split Stack:</strong> Right-click slot</span>
+          <span><kbd className="px-1 bg-white border border-[#888] rounded">E</kbd> / <kbd className="px-1 bg-white border border-[#888] rounded">ESC</kbd> Close</span>
         </div>
       </div>
     </div>

@@ -927,6 +927,34 @@ export const BLOCK_DEFS: Record<BlockType, BlockDefinition> = {
     requiredToolType: 'shovel',
     drops: [{ id: 'red_sand', count: 1 }],
   },
+  [BlockType.SOUL_LANTERN]: {
+    type: BlockType.SOUL_LANTERN,
+    id: 'soul_lantern',
+    name: 'Soul Lantern',
+    isSolid: true,
+    isTransparent: true,
+    hardness: 0.35,
+    requiredToolType: 'pickaxe',
+    drops: [{ id: 'soul_lantern', count: 1 }],
+  },
+  [BlockType.CANDLE]: {
+    type: BlockType.CANDLE,
+    id: 'candle',
+    name: 'Lit Candle',
+    isSolid: true,
+    isTransparent: true,
+    hardness: 0.1,
+    drops: [{ id: 'candle', count: 1 }],
+  },
+  [BlockType.SOUL_CANDLE]: {
+    type: BlockType.SOUL_CANDLE,
+    id: 'soul_candle',
+    name: 'Soul Candle',
+    isSolid: true,
+    isTransparent: true,
+    hardness: 0.1,
+    drops: [{ id: 'soul_candle', count: 1 }],
+  },
 };
 
 export const ITEM_MAX_DURABILITY: Partial<Record<ItemId, number>> = {
@@ -970,5 +998,8 @@ export const FOOD_RESTORE: Partial<Record<ItemId, { hunger: number; saturation: 
   cooked_porkchop: { hunger: 8, saturation: 12.8 },
   raw_beef: { hunger: 3, saturation: 1.8 },
   cooked_beef: { hunger: 8, saturation: 12.8 },
+  raw_chicken: { hunger: 2, saturation: 1.2 },
+  cooked_chicken: { hunger: 6, saturation: 7.2 },
+  carrot: { hunger: 3, saturation: 3.6 },
   rotten_flesh: { hunger: 4, saturation: 0.8 },
 };

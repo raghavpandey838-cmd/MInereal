@@ -107,6 +107,9 @@ export enum BlockType {
   TERRACOTTA_RED = 99,
   TERRACOTTA_WHITE = 100,
   RED_SAND = 101,
+  SOUL_LANTERN = 102,
+  CANDLE = 103,
+  SOUL_CANDLE = 104,
 }
 
 export type ItemId =
@@ -213,6 +216,9 @@ export type ItemId =
   | 'terracotta_red'
   | 'terracotta_white'
   | 'red_sand'
+  | 'soul_lantern'
+  | 'candle'
+  | 'soul_candle'
   // Tools
   | 'wooden_pickaxe'
   | 'stone_pickaxe'
@@ -248,7 +254,12 @@ export type ItemId =
   | 'feather'
   | 'gunpowder'
   | 'rotten_flesh'
-  | 'bone';
+  | 'bone'
+  | 'raw_chicken'
+  | 'cooked_chicken'
+  | 'egg'
+  | 'seeds'
+  | 'carrot';
 
 export interface ItemStack {
   id: ItemId;
@@ -287,7 +298,7 @@ export interface PlayerStats {
 
 export interface MobEntity {
   id: string;
-  type: 'zombie' | 'skeleton' | 'creeper' | 'pig' | 'cow' | 'sheep';
+  type: 'zombie' | 'skeleton' | 'creeper' | 'pig' | 'cow' | 'sheep' | 'chicken';
   x: number;
   y: number;
   z: number;
@@ -303,6 +314,8 @@ export interface MobEntity {
   isGrounded: boolean;
   fuse?: number; // for creeper
   burning?: number; // daylight burn for zombies
+  fleeTimer?: number;
+  grazeTimer?: number;
 }
 
 export interface DroppedItemEntity {

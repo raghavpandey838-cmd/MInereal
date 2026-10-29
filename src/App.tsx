@@ -201,7 +201,7 @@ export default function App() {
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.38;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -231,11 +231,13 @@ export default function App() {
     vehicles.spawnVehicle('bike', safeSpawn.x - 3, spawnY + 1, safeSpawn.z + 3, Math.PI / 4);
     vehicles.spawnVehicle('boat', safeSpawn.x + 15, 24, safeSpawn.z + 15, 0);
 
-    // Starter mobs on dry land
-    entities.spawnMob('pig', safeSpawn.x + 4, spawnY + 1, safeSpawn.z + 2);
+    // Starter realistic animals on dry land
+    entities.spawnMob('cow', safeSpawn.x + 5, spawnY + 1, safeSpawn.z + 2);
     entities.spawnMob('pig', safeSpawn.x - 4, spawnY + 1, safeSpawn.z + 3);
-    entities.spawnMob('zombie', safeSpawn.x + 14, world.findHighestSolidY(safeSpawn.x + 14, safeSpawn.z + 14) + 1, safeSpawn.z + 14);
-    entities.spawnMob('creeper', safeSpawn.x - 12, world.findHighestSolidY(safeSpawn.x - 12, safeSpawn.z - 10) + 1, safeSpawn.z - 10);
+    entities.spawnMob('sheep', safeSpawn.x + 3, spawnY + 1, safeSpawn.z - 4);
+    entities.spawnMob('chicken', safeSpawn.x - 2, spawnY + 1, safeSpawn.z - 3);
+    entities.spawnMob('zombie', safeSpawn.x + 16, world.findHighestSolidY(safeSpawn.x + 16, safeSpawn.z + 16) + 1, safeSpawn.z + 16);
+    entities.spawnMob('creeper', safeSpawn.x - 14, world.findHighestSolidY(safeSpawn.x - 14, safeSpawn.z - 12) + 1, safeSpawn.z - 12);
 
     // 6. Hand Renderer & Block Highlighter
     const hand = new HandRenderer(camera);
@@ -387,7 +389,7 @@ export default function App() {
       return newInv;
     });
 
-    sounds.playCraft();
+    sounds.playEat();
   }, [selectedHotbarIndex]);
 
   // Rotate camera horizontally (for trackpad buttons or arrow keys)
@@ -1090,10 +1092,17 @@ export default function App() {
         engine.miningProgress = 0;
       }
 
-      // 8. Update Mobs AI & Combat
-      entities.updateMobs(world, playerPos, dt, (damage) => {
-        applyPlayerDamage(damage);
-      });
+      // 8. Update Mobs AI & Combat (Food following & grazing)
+      const currentHeldId = inventory[selectedHotbarIndex]?.id || null;
+      entities.updateMobs(
+        world,
+        playerPos,
+        dt,
+        (damage) => {
+          applyPlayerDamage(damage);
+        },
+        currentHeldId
+      );
 
       // 9. Update Dropped Items (vacuum pickup)
       entities.updateDroppedItems(world, playerPos, dt, (dropped) => {
@@ -1162,7 +1171,16 @@ export default function App() {
         const dot = forwardDir.dot(toMob);
         if (dot > 0.85) {
           const held = inventory[selectedHotbarIndex];
-          const damage = (held && ITEM_ATTACK_DAMAGE[held.id]) || 4;
+          let damage = (held && ITEM_ATTACK_DAMAGE[held.id]) || 4;
+
+          // Authentic Minecraft Critical Hit: Hitting mob while falling
+          const isCritical = engine.playerVel.y < -0.3 && !isFlying;
+          if (isCritical) {
+            damage = Math.floor(damage * 1.5);
+            sounds.playCrit();
+            engine.entities.spawnParticleBurst(mob.entity.x, mob.entity.y + 0.8, mob.entity.z, '#fbbf24', 24);
+          }
+
           engine.entities.damageMob(i, damage, forwardDir);
           engine.isMining = false;
           return;
@@ -1184,6 +1202,29 @@ export default function App() {
           [{ x: hit.x, y: hit.y, z: hit.z, oldType, newType: BlockType.AIR }],
         ]);
         engine.highlighter.setCrackStage(0, 0, 0, 0);
+
+        // Remove dynamic point light if a light source was broken
+        const isLightSource =
+          oldType === BlockType.TORCH ||
+          oldType === BlockType.LANTERN ||
+          oldType === BlockType.SOUL_LANTERN ||
+          oldType === BlockType.CANDLE ||
+          oldType === BlockType.SOUL_CANDLE ||
+          oldType === BlockType.REDSTONE_LAMP ||
+          oldType === BlockType.SEA_LANTERN ||
+          oldType === BlockType.GLOWSTONE;
+
+        if (isLightSource) {
+          const targetPos = new THREE.Vector3(hit.x + 0.5, hit.y + 0.6, hit.z + 0.5);
+          for (let i = engine.torchLights.length - 1; i >= 0; i--) {
+            const light = engine.torchLights[i];
+            if (light.position.distanceTo(targetPos) < 1.4) {
+              engine.scene.remove(light);
+              light.dispose();
+              engine.torchLights.splice(i, 1);
+            }
+          }
+        }
       }
     }
   };
@@ -1213,6 +1254,66 @@ export default function App() {
     }
 
     const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion);
+
+    // Check feeding animal with food on right click/tap
+    const heldItem = inventory[selectedHotbarIndex];
+    const isAnimalFood =
+      heldItem &&
+      (heldItem.id === 'wheat' ||
+        heldItem.id === 'hay_bale' ||
+        heldItem.id === 'apple' ||
+        heldItem.id === 'bread' ||
+        heldItem.id === 'seeds' ||
+        heldItem.id === 'carrot' ||
+        heldItem.id === 'raw_beef' ||
+        heldItem.id === 'raw_porkchop');
+
+    for (let i = 0; i < engine.entities.mobs.length; i++) {
+      const mob = engine.entities.mobs[i];
+      const dist = Math.hypot(
+        engine.playerPos.x - mob.entity.x,
+        engine.playerPos.y - mob.entity.y,
+        engine.playerPos.z - mob.entity.z
+      );
+
+      if (dist < 4.0) {
+        const toMob = new THREE.Vector3(
+          mob.entity.x - engine.playerPos.x,
+          mob.entity.y + 0.6 - (engine.playerPos.y + 1.62),
+          mob.entity.z - engine.playerPos.z
+        ).normalize();
+
+        if (forwardDir.dot(toMob) > 0.82) {
+          if (isAnimalFood) {
+            // Heal animal & spawn loving hearts
+            mob.entity.health = mob.entity.maxHealth;
+            engine.entities.spawnParticleBurst(mob.entity.x, mob.entity.y + 0.8, mob.entity.z, '#f43f5e', 18);
+            sounds.playEat();
+            if (mob.entity.type === 'cow') sounds.playCowMoo();
+            else if (mob.entity.type === 'sheep') sounds.playSheepBaa();
+            else if (mob.entity.type === 'pig') sounds.playPigOink();
+            else if (mob.entity.type === 'chicken') sounds.playChickenCluck();
+
+            if (gameMode === 'survival') {
+              setInventory((prev) => {
+                const newInv = [...prev];
+                const slot = newInv[selectedHotbarIndex];
+                if (slot) {
+                  if (slot.count > 1) {
+                    newInv[selectedHotbarIndex] = { ...slot, count: slot.count - 1 };
+                  } else {
+                    newInv[selectedHotbarIndex] = null;
+                  }
+                }
+                return newInv;
+              });
+            }
+            return;
+          }
+        }
+      }
+    }
+
     const hit = engine.world.raycast(engine.camera.position, forwardDir, 5.5);
 
     if (hit.hit) {
@@ -1298,11 +1399,56 @@ export default function App() {
           [{ x: placeX, y: placeY, z: placeZ, oldType, newType: placeBlockType! }],
         ]);
 
-        if (placeBlockType === BlockType.TORCH && engine.torchLights.length < 20) {
-          const torchLight = new THREE.PointLight(0xffaa44, 1.2, 12);
-          torchLight.position.set(placeX + 0.5, placeY + 0.8, placeZ + 0.5);
-          engine.scene.add(torchLight);
-          engine.torchLights.push(torchLight);
+        // Dynamic Light Source Placement (Lanterns, Candles, Torches, Lamps, Sea Lanterns, Glowstone)
+        const isLightBlock =
+          placeBlockType === BlockType.TORCH ||
+          placeBlockType === BlockType.LANTERN ||
+          placeBlockType === BlockType.SOUL_LANTERN ||
+          placeBlockType === BlockType.CANDLE ||
+          placeBlockType === BlockType.SOUL_CANDLE ||
+          placeBlockType === BlockType.REDSTONE_LAMP ||
+          placeBlockType === BlockType.SEA_LANTERN ||
+          placeBlockType === BlockType.GLOWSTONE;
+
+        if (isLightBlock && engine.torchLights.length < 45) {
+          let lightColor = 0xffaa44;
+          let lightIntensity = 1.6;
+          let lightDistance = 14;
+
+          if (placeBlockType === BlockType.LANTERN) {
+            lightColor = 0xffb844;
+            lightIntensity = 1.85;
+            lightDistance = 16;
+          } else if (placeBlockType === BlockType.SOUL_LANTERN) {
+            lightColor = 0x38e8f8;
+            lightIntensity = 1.65;
+            lightDistance = 15;
+          } else if (placeBlockType === BlockType.CANDLE) {
+            lightColor = 0xffa033;
+            lightIntensity = 1.4;
+            lightDistance = 13;
+          } else if (placeBlockType === BlockType.SOUL_CANDLE) {
+            lightColor = 0x40e0ff;
+            lightIntensity = 1.35;
+            lightDistance = 12;
+          } else if (placeBlockType === BlockType.REDSTONE_LAMP) {
+            lightColor = 0xff9922;
+            lightIntensity = 1.9;
+            lightDistance = 17;
+          } else if (placeBlockType === BlockType.SEA_LANTERN) {
+            lightColor = 0x88f5ea;
+            lightIntensity = 1.8;
+            lightDistance = 16;
+          } else if (placeBlockType === BlockType.GLOWSTONE) {
+            lightColor = 0xffdd66;
+            lightIntensity = 1.85;
+            lightDistance = 16;
+          }
+
+          const pointLight = new THREE.PointLight(lightColor, lightIntensity, lightDistance);
+          pointLight.position.set(placeX + 0.5, placeY + 0.65, placeZ + 0.5);
+          engine.scene.add(pointLight);
+          engine.torchLights.push(pointLight);
         }
 
         if (gameMode === 'survival') {

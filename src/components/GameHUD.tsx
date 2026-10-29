@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ItemStack, PlayerStats } from '../game/types';
 import { getItemIcon } from '../game/textures';
 import { sounds } from '../game/audio';
@@ -81,6 +81,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onMineStop,
   onInteract,
 }) => {
+  const [guiScale, setGuiScale] = useState<'compact' | 'normal'>('compact');
   const selectedItem = hotbar[selectedIndex] || null;
 
   const getItemDisplayName = (id: string): string => {
@@ -94,7 +95,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden flex flex-col justify-between">
       {/* Screen Center Crosshair */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="drop-shadow-sm">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="drop-shadow-sm">
           <line x1="10" y1="2" x2="10" y2="18" stroke="rgba(255,255,255,0.85)" strokeWidth="2" />
           <line x1="2" y1="10" x2="18" y2="10" stroke="rgba(255,255,255,0.85)" strokeWidth="2" />
         </svg>
@@ -102,34 +103,34 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       {/* Advancement Toast Notification (Top-Right Pop-In) */}
       {recentAdvancement && (
-        <div className="absolute top-16 right-4 z-50 pointer-events-auto animate-bounce shadow-2xl">
-          <div className="bg-[#1f1a14] border-2 border-[#d97706] text-white px-4 py-2.5 rounded-lg flex items-center gap-3 max-w-sm backdrop-blur-md">
-            <span className="text-3xl p-1 bg-yellow-500/20 rounded border border-yellow-400">
+        <div className="absolute top-14 right-2 sm:right-4 z-50 pointer-events-auto animate-bounce shadow-2xl">
+          <div className="bg-[#1f1a14]/95 border-2 border-[#d97706] text-white px-3 py-2 rounded-lg flex items-center gap-2.5 max-w-xs backdrop-blur-md">
+            <span className="text-2xl p-1 bg-yellow-500/20 rounded border border-yellow-400">
               {recentAdvancement.icon}
             </span>
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-yellow-400 font-bold flex items-center gap-1 font-mono">
+              <div className="text-[9px] uppercase tracking-wider text-yellow-400 font-bold flex items-center gap-1 font-mono">
                 <span>🏆 ADVANCEMENT MADE!</span>
               </div>
-              <div className="font-bold text-sm text-yellow-100">{recentAdvancement.title}</div>
-              <div className="text-[11px] text-gray-300 leading-snug">{recentAdvancement.description}</div>
+              <div className="font-bold text-xs text-yellow-100">{recentAdvancement.title}</div>
+              <div className="text-[10px] text-gray-300 leading-snug">{recentAdvancement.description}</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Top Bar: Clean responsive header that never overlaps on mobile or desktop */}
-      <div className="p-2 md:p-3 text-xs text-white/90 drop-shadow flex items-center justify-between gap-1 md:gap-2 z-20 w-full">
+      {/* Top Bar: Ultra-slim responsive header that never covers screen on mobile */}
+      <div className="p-1 sm:p-2 text-[10px] sm:text-xs text-white/90 drop-shadow flex items-center justify-between gap-1 z-20 w-full">
         {/* Left: Pause Button & Coordinates */}
-        <div className="flex items-center gap-1 md:gap-1.5 pointer-events-auto shrink-0">
-          {/* Pause Button - Essential for 1-click mobile menu / saving */}
+        <div className="flex items-center gap-1 pointer-events-auto shrink-0">
+          {/* Pause Button */}
           {onPauseGame && (
             <button
               onClick={() => {
                 sounds.playPop();
                 onPauseGame();
               }}
-              className="mc-btn px-2 py-1 text-xs font-bold cursor-pointer bg-red-900/80 hover:bg-red-800 text-white border-red-400"
+              className="mc-btn w-6 h-6 sm:w-7 sm:h-7 p-0 flex items-center justify-center text-[10px] sm:text-xs font-bold cursor-pointer bg-red-900/80 hover:bg-red-800 text-white border-red-400"
               title="Pause Game / Game Menu (ESC on PC)"
             >
               ⏸️
@@ -137,8 +138,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           )}
 
           {/* Compass & Coordinates */}
-          <div className="bg-black/70 px-2 py-1 md:px-3 md:py-1.5 rounded border border-white/20 flex items-center gap-1.5 font-mono shadow-md text-[11px] md:text-xs">
-            <span className="text-yellow-400 font-bold hidden sm:inline">🧭 {compassHeading} |</span>
+          <div className="bg-black/60 px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded border border-white/20 flex items-center gap-1 font-mono shadow-xs text-[9px] sm:text-[11px]">
+            <span className="text-yellow-400 font-bold hidden md:inline">🧭 {compassHeading} |</span>
             <span className="text-cyan-300 font-bold">
               X:{Math.floor(playerCoords.x)} Y:{Math.floor(playerCoords.y)} Z:{Math.floor(playerCoords.z)}
             </span>
@@ -252,13 +253,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 sounds.playPop();
                 onToggleFly();
               }}
-              className={`mc-btn px-2 py-1 text-xs font-bold cursor-pointer flex items-center gap-1 ${
+              className={`mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer flex items-center gap-0.5 ${
                 isFlying ? 'bg-cyan-700 text-cyan-100 border-cyan-400' : ''
               }`}
               title="Toggle Flight Mode [F]"
             >
               <span>🕊️</span>
-              <span className="hidden sm:inline">{isFlying ? 'FLY ON' : 'FLY'}</span>
+              <span className="hidden sm:inline">{isFlying ? 'FLY' : 'FLY'}</span>
             </button>
             {isFlying && (
               <button
@@ -266,10 +267,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   sounds.playPop();
                   onToggleFlySpeed();
                 }}
-                className="mc-btn px-1.5 py-1 text-xs font-bold cursor-pointer text-yellow-300 ml-0.5"
+                className="mc-btn px-1 py-0.5 sm:px-1.5 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer text-yellow-300 ml-0.5"
                 title="Cycle Flight Speed (1x, 2x, 3x)"
               >
-                🚀{flySpeedMultiplier}x
+                {flySpeedMultiplier}x
               </button>
             )}
           </div>
@@ -280,7 +281,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               sounds.playPop();
               onOpenBuildMenu();
             }}
-            className="mc-btn px-2 md:px-3 py-1 text-xs font-bold text-yellow-200 hover:text-white cursor-pointer shadow-lg flex items-center gap-1 border-2 border-yellow-400 bg-gradient-to-b from-[#3b6ea5] to-[#254668]"
+            className="mc-btn px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-bold text-yellow-200 hover:text-white cursor-pointer shadow flex items-center gap-1 border border-yellow-400 bg-gradient-to-b from-[#3b6ea5] to-[#254668]"
             title="Open Master Build Studio [B]"
           >
             <span>⚒️</span>
@@ -293,7 +294,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               sounds.playPop();
               onOpenInventory();
             }}
-            className="mc-btn px-2 md:px-2.5 py-1 text-xs font-bold cursor-pointer flex items-center gap-1"
+            className="mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer flex items-center gap-0.5"
             title="Open Inventory / Crafting [E]"
           >
             <span>🎒</span>
@@ -306,11 +307,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               sounds.playPop();
               onOpenAdvancements();
             }}
-            className="mc-btn px-2 py-1 text-xs font-bold text-yellow-300 cursor-pointer shadow flex items-center gap-1 border border-yellow-500/60"
+            className="mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold text-yellow-300 cursor-pointer shadow hidden sm:flex items-center gap-0.5 border border-yellow-500/60"
             title="Open Advancements & Trophies"
           >
             <span>🏆</span>
-            <span className="hidden md:inline">TROPHIES</span>
           </button>
 
           {/* Home Teleport */}
@@ -319,7 +319,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               sounds.playPop();
               onTeleportHome();
             }}
-            className="mc-btn px-2 py-1 text-xs font-bold cursor-pointer"
+            className="mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer"
             title="Teleport to Spawn"
           >
             🏠
@@ -332,7 +332,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               onUndo();
             }}
             disabled={!canUndo}
-            className="mc-btn px-2 py-1 text-xs font-bold cursor-pointer disabled:opacity-40"
+            className="mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer disabled:opacity-40"
             title="Undo last placed structure (Z)"
           >
             <span>↩</span>
@@ -344,10 +344,24 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               sounds.playPop();
               onToggleMute();
             }}
-            className="mc-btn px-2 py-1 text-xs font-bold cursor-pointer"
+            className="mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer"
             title="Toggle Audio"
           >
             {isMuted ? '🔇' : '🔊'}
+          </button>
+
+          {/* GUI Scale Toggle (Compact for Mobile / Large) */}
+          <button
+            onClick={() => {
+              sounds.playPop();
+              setGuiScale((s) => (s === 'compact' ? 'normal' : 'compact'));
+            }}
+            className={`mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer transition-colors ${
+              guiScale === 'compact' ? 'bg-cyan-800/80 border-cyan-400 text-cyan-100' : 'bg-black/60 text-gray-300'
+            }`}
+            title="Toggle HUD GUI Scale (Compact for Mobile / Large)"
+          >
+            📐 {guiScale === 'compact' ? 'MINI' : 'FULL'}
           </button>
 
           {/* Mobile On-Screen Controls Toggle */}
@@ -356,7 +370,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               sounds.playPop();
               onToggleMobileControls();
             }}
-            className={`mc-btn px-2 py-1 text-xs font-bold cursor-pointer transition-colors ${
+            className={`mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer transition-colors ${
               showMobileControls ? 'bg-green-700/80 border-green-400 text-green-100' : 'bg-black/60 text-gray-300'
             }`}
             title="Toggle Mobile On-Screen Keys"
@@ -393,23 +407,27 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       </div>
 
       {/* Bottom HUD: Authentic Minecraft Bottom Interface with Hearts, Hunger, XP Bar, Hotbar & 1-Click Actions */}
-      <div className="fixed bottom-1 md:bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center z-20 max-w-[98vw]">
+      <div
+        className={`fixed bottom-1 md:bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center z-20 max-w-[98vw] transition-transform ${
+          guiScale === 'compact' ? 'scale-85 sm:scale-95 md:scale-100 origin-bottom' : 'scale-100 origin-bottom'
+        }`}
+      >
         {/* Selected Held Item Tooltip Banner */}
         {selectedItem && (
-          <div className="mb-1 text-center font-bold text-xs sm:text-sm text-yellow-300 bg-black/85 px-3 py-0.5 rounded-full border border-white/25 shadow-lg drop-shadow backdrop-blur-xs flex items-center gap-1.5 animate-fade-in">
+          <div className="mb-0.5 sm:mb-1 text-center font-bold text-[10px] sm:text-xs text-yellow-300 bg-black/85 px-2.5 py-0.5 rounded-full border border-white/20 shadow-md drop-shadow backdrop-blur-xs flex items-center gap-1 animate-fade-in">
             <span>{getItemDisplayName(selectedItem.id)}</span>
-            <span className="text-[10px] text-gray-400 hidden sm:inline">
+            <span className="text-[9px] text-gray-400 hidden sm:inline">
               · [Left-Click: Mine · Right-Click: Place]
             </span>
           </div>
         )}
 
         {/* Health Hearts, Level Badge & Hunger Drumsticks (Authentic Minecraft HUD) */}
-        <div className="w-full flex items-center justify-between max-w-[340px] sm:max-w-[420px] mb-1 px-1">
+        <div className="w-full flex items-center justify-between max-w-[270px] sm:max-w-[340px] mb-0.5 sm:mb-1 px-1">
           {/* Health Hearts (10 Hearts) */}
           <div className="flex items-center gap-0.5" title="Player Health (20 HP)">
             {Array.from({ length: 10 }).map((_, i) => (
-              <span key={`heart-${i}`} className="text-red-500 text-xs sm:text-sm drop-shadow leading-none select-none">
+              <span key={`heart-${i}`} className="text-red-500 text-[10px] sm:text-xs drop-shadow leading-none select-none">
                 {i * 2 + 1 < (playerStats?.health ?? 20) ? '❤️' : '💔'}
               </span>
             ))}
@@ -417,7 +435,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           {/* Level Number */}
           <div
-            className="text-[#55ff55] font-bold text-xs sm:text-sm font-mono drop-shadow-[1px_1px_0px_#000] px-1.5 bg-black/60 rounded border border-green-500/30"
+            className="text-[#55ff55] font-bold text-[10px] sm:text-xs font-mono drop-shadow-[1px_1px_0px_#000] px-1 bg-black/60 rounded border border-green-500/30"
             title="Experience Level"
           >
             {playerStats?.level ?? 1}
@@ -426,7 +444,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           {/* Hunger Drumsticks (10 Drumsticks) */}
           <div className="flex items-center gap-0.5" title="Hunger / Food Meter">
             {Array.from({ length: 10 }).map((_, i) => (
-              <span key={`hunger-${i}`} className="text-amber-500 text-xs sm:text-sm drop-shadow leading-none select-none">
+              <span key={`hunger-${i}`} className="text-amber-500 text-[10px] sm:text-xs drop-shadow leading-none select-none">
                 🍗
               </span>
             ))}
@@ -434,12 +452,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
 
         {/* Green XP Experience Bar */}
-        <div className="w-full max-w-[340px] sm:max-w-[420px] h-1.5 bg-black/80 rounded-full border border-black overflow-hidden mb-1 shadow-inner">
+        <div className="w-full max-w-[270px] sm:max-w-[340px] h-1 bg-black/80 rounded-full border border-black overflow-hidden mb-0.5 sm:mb-1 shadow-inner">
           <div className="h-full bg-gradient-to-r from-lime-500 via-green-400 to-lime-300 w-full animate-pulse" />
         </div>
 
-        {/* 9-Slot Authentic Hotbar (Single-Click Responsive) */}
-        <div className="flex bg-[#8f8f8f] p-0.5 md:p-1 border-t-2 border-l-2 border-[#dbdbdb] border-r-2 border-b-2 border-[#2b2b2b] shadow-2xl rounded-xs max-w-full overflow-x-auto">
+        {/* 9-Slot Authentic Hotbar (Single-Click Responsive, Compact on Mobile) */}
+        <div className="flex bg-[#8f8f8f] p-0.5 border-t-2 border-l-2 border-[#dbdbdb] border-r-2 border-b-2 border-[#2b2b2b] shadow-2xl rounded-xs max-w-full overflow-x-auto">
           {hotbar.map((slot, index) => {
             const isSelected = selectedIndex === index;
             const iconUrl = slot ? getItemIcon(slot.id) : null;
@@ -450,14 +468,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   sounds.playPop();
                   onSelectSlot(index);
                 }}
-                className={`w-7 h-7 sm:w-9 sm:h-9 md:w-10 md:h-10 flex items-center justify-center relative cursor-pointer m-0.5 shrink-0 ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center relative cursor-pointer m-0.5 shrink-0 ${
                   isSelected
                     ? 'border-2 border-white bg-[#a8a8a8] shadow-inner scale-105 z-10'
                     : 'border border-[#383838] bg-[#8b8b8b] hover:bg-[#9a9a9a]'
                 }`}
               >
                 {/* Slot number hint */}
-                <span className="absolute top-0.5 left-0.5 md:left-1 text-[7px] md:text-[9px] text-white/50 leading-none">
+                <span className="absolute top-0.5 left-0.5 text-[7px] sm:text-[8px] text-white/50 leading-none">
                   {index + 1}
                 </span>
 
@@ -466,13 +484,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   <img
                     src={iconUrl}
                     alt={slot?.id}
-                    className="w-4 h-4 sm:w-6 sm:h-6 md:w-7 md:h-7 object-contain pixelated pointer-events-none drop-shadow"
+                    className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 object-contain pixelated pointer-events-none drop-shadow"
                   />
                 )}
 
                 {/* Count Badge (∞ in Creative Mode!) */}
                 {slot && (
-                  <span className="absolute bottom-0.5 right-0.5 md:right-1 text-[9px] md:text-xs font-bold text-yellow-300 drop-shadow-[1px_1px_0px_#222]">
+                  <span className="absolute bottom-0.5 right-0.5 text-[8px] sm:text-[9px] font-bold text-yellow-300 drop-shadow-[1px_1px_0px_#222]">
                     ∞
                   </span>
                 )}
@@ -481,15 +499,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           })}
         </div>
 
-        {/* Laptop 1-Click Action Toolbar */}
-        <div className="mt-1 flex items-center justify-center gap-1 flex-wrap pointer-events-auto">
+        {/* Laptop-Only 1-Click Action Toolbar (Hidden on Mobile Phone screens to keep world view clear) */}
+        <div className="hidden md:flex mt-1 items-center justify-center gap-1 flex-wrap pointer-events-auto">
           {onMineStart && (
             <button
               onClick={() => {
                 onMineStart();
                 setTimeout(() => onMineStop?.(), 120);
               }}
-              className="mc-btn px-2 py-1 text-[11px] font-bold text-red-200 border-red-500/60 bg-red-950/60 hover:bg-red-900/80 cursor-pointer flex items-center gap-1 active:scale-95 shadow"
+              className="mc-btn px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-red-200 border-red-500/60 bg-red-950/60 hover:bg-red-900/80 cursor-pointer flex items-center gap-1 active:scale-95 shadow"
               title="1-Click Instant Break Block (or Left Click)"
             >
               <span>⛏️</span>
@@ -500,7 +518,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           {onInteract && (
             <button
               onClick={() => onInteract()}
-              className="mc-btn px-2 py-1 text-[11px] font-bold text-green-200 border-green-500/60 bg-green-950/60 hover:bg-green-900/80 cursor-pointer flex items-center gap-1 active:scale-95 shadow"
+              className="mc-btn px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-green-200 border-green-500/60 bg-green-950/60 hover:bg-green-900/80 cursor-pointer flex items-center gap-1 active:scale-95 shadow"
               title="1-Click Place Held Item (or Right Click)"
             >
               <span>🧱</span>

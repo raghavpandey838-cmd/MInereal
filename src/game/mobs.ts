@@ -22,6 +22,8 @@ export interface MobVisual {
   legFR?: THREE.Mesh;
   legBL?: THREE.Mesh;
   legBR?: THREE.Mesh;
+  wingL?: THREE.Mesh; // Chicken wings
+  wingR?: THREE.Mesh;
   flashTimer: number;
 }
 
@@ -61,7 +63,7 @@ export class EntityManager {
 
   // Spawn a mob
   public spawnMob(
-    type: 'zombie' | 'skeleton' | 'creeper' | 'pig' | 'cow' | 'sheep',
+    type: 'zombie' | 'skeleton' | 'creeper' | 'pig' | 'cow' | 'sheep' | 'chicken',
     x: number,
     y: number,
     z: number
@@ -79,6 +81,8 @@ export class EntityManager {
     let legFR: THREE.Mesh | undefined;
     let legBL: THREE.Mesh | undefined;
     let legBR: THREE.Mesh | undefined;
+    let wingL: THREE.Mesh | undefined;
+    let wingR: THREE.Mesh | undefined;
 
     let maxHealth = 20;
 
@@ -117,20 +121,45 @@ export class EntityManager {
       rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.75, 0.24), legMat);
       rightLeg.position.set(0.13, 0.38, 0);
       group.add(rightLeg);
+    } else if (type === 'skeleton') {
+      maxHealth = 20;
+      const boneMat = new THREE.MeshStandardMaterial({ color: 0xdedede, roughness: 0.7 });
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), boneMat);
+      head.position.y = 1.65;
+      group.add(head);
+
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.75, 0.2), boneMat);
+      body.position.y = 1.05;
+      group.add(body);
+
+      leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.75, 0.15), boneMat);
+      leftArm.position.set(-0.32, 1.05, 0.3);
+      leftArm.rotation.x = -Math.PI / 2.2;
+      group.add(leftArm);
+
+      rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.75, 0.15), boneMat);
+      rightArm.position.set(0.32, 1.05, 0.3);
+      rightArm.rotation.x = -Math.PI / 2.2;
+      group.add(rightArm);
+
+      leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.75, 0.15), boneMat);
+      leftLeg.position.set(-0.12, 0.38, 0);
+      group.add(leftLeg);
+
+      rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.75, 0.15), boneMat);
+      rightLeg.position.set(0.12, 0.38, 0);
+      group.add(rightLeg);
     } else if (type === 'creeper') {
       maxHealth = 20;
-      // Head
       const creeperMat = new THREE.MeshStandardMaterial({ color: 0x42963b, roughness: 0.8 });
       head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), creeperMat);
       head.position.y = 1.45;
       group.add(head);
 
-      // Torso
       body = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.65, 0.25), creeperMat);
       body.position.y = 0.9;
       group.add(body);
 
-      // 4 stubby legs
       const legMat = new THREE.MeshStandardMaterial({ color: 0x367a30, roughness: 0.8 });
       legFL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.45, 0.2), legMat);
       legFL.position.set(-0.15, 0.22, 0.15);
@@ -148,16 +177,30 @@ export class EntityManager {
       legBR.position.set(0.15, 0.22, -0.15);
       group.add(legBR);
     } else if (type === 'sheep') {
-      // Sheep (Passive fluffy mob)
+      // Sheep (Fluffy realistic sheep with wool coat, pink face & eyes)
       maxHealth = 8;
       const faceMat = new THREE.MeshStandardMaterial({ color: 0xdfcbb5, roughness: 0.8 });
-      head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.42, 0.48), faceMat);
-      head.position.set(0, 0.85, 0.45);
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.42, 0.46), faceMat);
+      head.position.set(0, 0.85, 0.42);
       group.add(head);
 
-      // Fluffy wool body
-      const woolMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.95 });
-      body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.65, 1.0), woolMat);
+      // Wool top cap on head
+      const woolMat = new THREE.MeshStandardMaterial({ color: 0xf6f6f6, roughness: 0.95 });
+      const woolCap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.16, 0.46), woolMat);
+      woolCap.position.set(0, 0.98, 0.4);
+      group.add(woolCap);
+
+      // Black eyes
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), eyeMat);
+      eyeL.position.set(-0.2, 0.88, 0.55);
+      group.add(eyeL);
+      const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), eyeMat);
+      eyeR.position.set(0.2, 0.88, 0.55);
+      group.add(eyeR);
+
+      // Fluffy wool body (puffy geometry)
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.68, 1.05), woolMat);
       body.position.set(0, 0.72, 0);
       group.add(body);
 
@@ -178,18 +221,46 @@ export class EntityManager {
       legBR.position.set(0.2, 0.22, -0.3);
       group.add(legBR);
     } else if (type === 'cow') {
-      // Dairy Cow
+      // Dairy Cow (Realistic with horns, snout, patched hide, and pink udders)
       maxHealth = 10;
       const cowMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 });
-      head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.5), cowMat);
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.46, 0.48), cowMat);
       head.position.set(0, 0.9, 0.45);
       group.add(head);
 
-      body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.75, 1.05), cowMat);
+      // Authentic Cow Horns
+      const hornMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.6 });
+      const hornL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.08), hornMat);
+      hornL.position.set(-0.28, 1.14, 0.44);
+      group.add(hornL);
+
+      const hornR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.08), hornMat);
+      hornR.position.set(0.28, 1.14, 0.44);
+      group.add(hornR);
+
+      // Protruding Snout with nostrils
+      const snoutMat = new THREE.MeshStandardMaterial({ color: 0x362c24, roughness: 0.8 });
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.22), snoutMat);
+      snout.position.set(0, 0.78, 0.68);
+      group.add(snout);
+
+      // Torso with white spot patches
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.75, 1.05), cowMat);
       body.position.set(0, 0.75, 0);
       group.add(body);
 
-      const legMat = new THREE.MeshStandardMaterial({ color: 0x33251a, roughness: 0.8 });
+      const whiteMat = new THREE.MeshStandardMaterial({ color: 0xdedede, roughness: 0.8 });
+      const patch = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 0.5), whiteMat);
+      patch.position.set(0, 0.8, -0.1);
+      group.add(patch);
+
+      // Pink Udders underneath
+      const udderMat = new THREE.MeshStandardMaterial({ color: 0xf4a8b8, roughness: 0.8 });
+      const udder = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 0.24), udderMat);
+      udder.position.set(0, 0.36, -0.15);
+      group.add(udder);
+
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x2d1f15, roughness: 0.8 });
       legFL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.45, 0.18), legMat);
       legFL.position.set(-0.2, 0.22, 0.32);
       group.add(legFL);
@@ -205,13 +276,84 @@ export class EntityManager {
       legBR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.45, 0.18), legMat);
       legBR.position.set(0.2, 0.22, -0.32);
       group.add(legBR);
+    } else if (type === 'chicken') {
+      // Chicken (White feather body, red comb, yellow beak, red wattle, flapping wings)
+      maxHealth = 4;
+      const chickenMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.8 });
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.32, 0.26), chickenMat);
+      head.position.set(0, 0.72, 0.22);
+      group.add(head);
+
+      // Bright Red Comb on top
+      const redMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.7 });
+      const comb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.16), redMat);
+      comb.position.set(0, 0.9, 0.22);
+      group.add(comb);
+
+      // Yellow Beak
+      const beakMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.6 });
+      const beak = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.14), beakMat);
+      beak.position.set(0, 0.72, 0.38);
+      group.add(beak);
+
+      // Red Wattle underneath beak
+      const wattle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.08), redMat);
+      wattle.position.set(0, 0.62, 0.32);
+      group.add(wattle);
+
+      // Feathered Body
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.52), chickenMat);
+      body.position.set(0, 0.48, 0);
+      group.add(body);
+
+      // Flapping Wings
+      wingL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.4), chickenMat);
+      wingL.position.set(-0.24, 0.48, 0);
+      group.add(wingL);
+
+      wingR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.4), chickenMat);
+      wingR.position.set(0.24, 0.48, 0);
+      group.add(wingR);
+
+      // Yellow Legs
+      leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.08), beakMat);
+      leftLeg.position.set(-0.1, 0.14, 0.04);
+      group.add(leftLeg);
+
+      rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.08), beakMat);
+      rightLeg.position.set(0.1, 0.14, 0.04);
+      group.add(rightLeg);
     } else {
-      // Pig (Passive)
+      // Pig (Authentic Minecraft pink pig with protruding snout, nostrils, and black/white eyes)
       maxHealth = 10;
       const pigMat = new THREE.MeshStandardMaterial({ color: 0xf29bb0, roughness: 0.8 });
-      head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), pigMat);
-      head.position.set(0, 0.75, 0.4);
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.48, 0.48), pigMat);
+      head.position.set(0, 0.74, 0.38);
       group.add(head);
+
+      // Protruding Pig Snout
+      const snoutMat = new THREE.MeshStandardMaterial({ color: 0xdb8397, roughness: 0.7 });
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.16, 0.16), snoutMat);
+      snout.position.set(0, 0.65, 0.64);
+      group.add(snout);
+
+      // Nostrils on snout
+      const nostrilMat = new THREE.MeshBasicMaterial({ color: 0x5a2030 });
+      const nostrilL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.02), nostrilMat);
+      nostrilL.position.set(-0.06, 0.65, 0.73);
+      group.add(nostrilL);
+      const nostrilR = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.02), nostrilMat);
+      nostrilR.position.set(0.06, 0.65, 0.73);
+      group.add(nostrilR);
+
+      // Eyes on sides of head
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), eyeMat);
+      eyeL.position.set(-0.25, 0.78, 0.54);
+      group.add(eyeL);
+      const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), eyeMat);
+      eyeR.position.set(0.25, 0.78, 0.54);
+      group.add(eyeR);
 
       body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.9), pigMat);
       body.position.set(0, 0.65, 0);
@@ -267,6 +409,8 @@ export class EntityManager {
       legFR,
       legBL,
       legBR,
+      wingL,
+      wingR,
       flashTimer: 0,
     };
 
@@ -279,7 +423,8 @@ export class EntityManager {
     world: VoxelWorld,
     playerPos: THREE.Vector3,
     dt: number,
-    onPlayerDamage: (amount: number) => void
+    onPlayerDamage: (amount: number) => void,
+    heldItemId?: ItemId | null
   ) {
     const mobPos = new THREE.Vector3();
     const mobVel = new THREE.Vector3();
@@ -338,6 +483,30 @@ export class EntityManager {
             ent.vz = Math.cos(ent.yaw) * 0.8;
           }
         }
+      } else if (ent.type === 'skeleton') {
+        if (distToPlayer < 18) {
+          const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
+          ent.yaw = angle;
+          // Keep distance (around 8-12 blocks) and strafe
+          if (distToPlayer < 7) {
+            ent.vx = -Math.sin(angle) * 1.8;
+            ent.vz = -Math.cos(angle) * 1.8;
+          } else if (distToPlayer > 12) {
+            ent.vx = Math.sin(angle) * 1.6;
+            ent.vz = Math.cos(angle) * 1.6;
+          } else {
+            ent.vx = Math.cos(angle) * 1.2;
+            ent.vz = -Math.sin(angle) * 1.2;
+          }
+
+          if (distToPlayer < 14 && Math.abs(dyToPlayer) < 3.0) {
+            if (ent.attackCooldown <= 0) {
+              onPlayerDamage(2);
+              sounds.playPlayerHurt();
+              ent.attackCooldown = 2.0;
+            }
+          }
+        }
       } else if (ent.type === 'creeper') {
         if (distToPlayer < 14) {
           const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
@@ -368,11 +537,69 @@ export class EntityManager {
           }
         }
       } else {
-        // Peaceful animals
-        if (Math.random() < 0.015) {
-          ent.yaw += (Math.random() - 0.5) * 2;
-          ent.vx = Math.sin(ent.yaw) * 1.2;
-          ent.vz = Math.cos(ent.yaw) * 1.2;
+        // Peaceful animals (Pig, Cow, Sheep, Chicken)
+        const isAnimalFood =
+          heldItemId &&
+          (heldItemId === 'wheat' ||
+            heldItemId === 'hay_bale' ||
+            heldItemId === 'apple' ||
+            heldItemId === 'bread' ||
+            heldItemId === 'seeds' ||
+            heldItemId === 'carrot' ||
+            heldItemId === 'raw_beef' ||
+            heldItemId === 'raw_porkchop');
+
+        // 1. Panic Fleeing when damaged
+        if (ent.fleeTimer && ent.fleeTimer > 0) {
+          ent.fleeTimer -= dt;
+          ent.vx = Math.sin(ent.yaw) * 3.0;
+          ent.vz = Math.cos(ent.yaw) * 3.0;
+          if (Math.random() < 0.06) {
+            ent.yaw += (Math.random() - 0.5) * 1.5;
+          }
+        }
+        // 2. Follow player eagerly when holding food!
+        else if (isAnimalFood && distToPlayer < 10) {
+          const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
+          ent.yaw = angle;
+          if (distToPlayer > 2.0) {
+            ent.vx = Math.sin(angle) * 1.7;
+            ent.vz = Math.cos(angle) * 1.7;
+          } else {
+            ent.vx = 0;
+            ent.vz = 0;
+          }
+          // Turn head toward player
+          mob.head.rotation.y = 0;
+        }
+        // 3. Idle Grazing / Wandering
+        else {
+          ent.grazeTimer = (ent.grazeTimer || 0) + dt;
+          // Grazing animation for Cow & Sheep: dips head to ground
+          if ((ent.type === 'cow' || ent.type === 'sheep') && ent.grazeTimer > 5.0 && ent.isGrounded) {
+            mob.head.rotation.x = 0.45;
+            ent.vx = 0;
+            ent.vz = 0;
+            if (ent.grazeTimer > 7.0) {
+              ent.grazeTimer = 0;
+              mob.head.rotation.x = 0;
+            }
+          } else {
+            mob.head.rotation.x = 0;
+            if (Math.random() < 0.015) {
+              ent.yaw += (Math.random() - 0.5) * 2;
+              ent.vx = Math.sin(ent.yaw) * 1.2;
+              ent.vz = Math.cos(ent.yaw) * 1.2;
+            }
+          }
+
+          // Random ambient sound when player is nearby
+          if (distToPlayer < 9 && Math.random() < 0.001) {
+            if (ent.type === 'cow') sounds.playCowMoo();
+            else if (ent.type === 'sheep') sounds.playSheepBaa();
+            else if (ent.type === 'pig') sounds.playPigOink();
+            else if (ent.type === 'chicken') sounds.playChickenCluck();
+          }
         }
       }
 
@@ -424,6 +651,14 @@ export class EntityManager {
         mob.legBL.rotation.x = -legAngle;
         mob.legBR.rotation.x = legAngle;
       }
+
+      // Chicken Flapping Wings Animation
+      if (mob.wingL && mob.wingR) {
+        const isFlapping = !ent.isGrounded || isMoving;
+        const wingAngle = isFlapping ? Math.sin(Date.now() * 0.02) * 0.7 : 0;
+        mob.wingL.rotation.z = -wingAngle;
+        mob.wingR.rotation.z = wingAngle;
+      }
     }
   }
 
@@ -435,13 +670,19 @@ export class EntityManager {
     mob.entity.health -= amount;
     mob.entity.hurtCooldown = 0.4;
     mob.flashTimer = 0.2;
+    mob.entity.fleeTimer = 3.5; // Panic flee when damaged
 
     // Apply knockback
     mob.entity.vx += knockbackDir.x * 6;
     mob.entity.vy += 4.5;
     mob.entity.vz += knockbackDir.z * 6;
 
-    sounds.playMobHurt();
+    // Animal hurt vocalization
+    if (mob.entity.type === 'cow') sounds.playCowMoo();
+    else if (mob.entity.type === 'sheep') sounds.playSheepBaa();
+    else if (mob.entity.type === 'pig') sounds.playPigOink();
+    else if (mob.entity.type === 'chicken') sounds.playChickenCluck();
+    else sounds.playMobHurt();
 
     // Red damage flash
     mob.group.traverse((child) => {
@@ -471,6 +712,14 @@ export class EntityManager {
         this.spawnDroppedItem({ id: 'gunpowder', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
       } else if (mob.entity.type === 'pig') {
         this.spawnDroppedItem({ id: 'raw_porkchop', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+      } else if (mob.entity.type === 'cow') {
+        this.spawnDroppedItem({ id: 'raw_beef', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+        this.spawnDroppedItem({ id: 'bone', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+      } else if (mob.entity.type === 'sheep') {
+        this.spawnDroppedItem({ id: 'white_wool', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+      } else if (mob.entity.type === 'chicken') {
+        this.spawnDroppedItem({ id: 'raw_chicken', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+        this.spawnDroppedItem({ id: 'feather', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
       }
     }
 

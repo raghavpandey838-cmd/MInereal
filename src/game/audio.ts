@@ -323,6 +323,177 @@ class SoundEngine {
     osc.stop(now + 0.75);
   }
 
+  // Cow deep moo
+  public playCowMoo() {
+    if (this.isMuted) return;
+    this.initCtx();
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(110, now);
+    osc.frequency.linearRampToValueAtTime(135, now + 0.25);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.9);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(320, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.25, now + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain!);
+
+    osc.start(now);
+    osc.stop(now + 0.95);
+  }
+
+  // Sheep bleat / baa
+  public playSheepBaa() {
+    if (this.isMuted) return;
+    this.initCtx();
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(240, now);
+    osc.frequency.linearRampToValueAtTime(210, now + 0.6);
+
+    const lfo = ctx.createOscillator();
+    lfo.frequency.setValueAtTime(14, now); // Rapid goat/sheep vibrato
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.setValueAtTime(18, now);
+    lfo.connect(osc.frequency);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.22, now + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain!);
+
+    lfo.start(now);
+    osc.start(now);
+    lfo.stop(now + 0.65);
+    osc.stop(now + 0.65);
+  }
+
+  // Pig oink
+  public playPigOink() {
+    if (this.isMuted) return;
+    this.initCtx();
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(120, now + 0.18);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(350, now);
+    filter.Q.setValueAtTime(3, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain!);
+
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  // Chicken cluck
+  public playChickenCluck() {
+    if (this.isMuted) return;
+    this.initCtx();
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    [0, 0.08].forEach((offset, idx) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(idx === 0 ? 460 : 380, now + offset);
+      osc.frequency.exponentialRampToValueAtTime(260, now + offset + 0.06);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.2, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.07);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.07);
+    });
+  }
+
+  // Crunchy food eating bite sound
+  public playEat() {
+    if (this.isMuted) return;
+    this.initCtx();
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const noiseBuffer = this.createNoiseBuffer(0.08);
+    if (!noiseBuffer) return;
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1400, now);
+    filter.Q.setValueAtTime(4, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain!);
+
+    noise.start(now);
+    noise.stop(now + 0.08);
+  }
+
+  // Critical hit sparkle chimes
+  public playCrit() {
+    if (this.isMuted) return;
+    this.initCtx();
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const notes = [880, 1108.73, 1318.51]; // A5, C#6, E6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + i * 0.04);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.18, now + i * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.15);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(now + i * 0.04);
+      osc.stop(now + i * 0.04 + 0.15);
+    });
+  }
+
   // Creeper fuse hiss
   public playCreeperHiss() {
     if (this.isMuted) return;

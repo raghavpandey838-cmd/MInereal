@@ -140,6 +140,9 @@ export enum TileIndex {
   TERRACOTTA_RED = 138,
   TERRACOTTA_WHITE = 139,
   RED_SAND = 140,
+  SOUL_LANTERN = 141,
+  CANDLE = 142,
+  SOUL_CANDLE = 143,
 
   // 240-249: Break stages 0-9
   BREAK_0 = 240,
@@ -199,13 +202,24 @@ export function createBlockAtlas(): THREE.CanvasTexture {
   // Clear with transparent
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 1. Dirt drawer
+  // 1. Dirt drawer (Rich earthy Minecraft soil texture)
   const getDirtPixel = (x: number, y: number): [number, number, number, number] => {
-    const n = pseudoRandom(x, y, 10);
-    const shade = 100 + Math.floor(n * 40);
-    const r = Math.floor(shade * 0.95);
-    const g = Math.floor(shade * 0.65);
-    const b = Math.floor(shade * 0.45);
+    const n1 = pseudoRandom(x, y, 10);
+    const n2 = pseudoRandom(Math.floor(x / 2), Math.floor(y / 2), 55);
+    const combined = n1 * 0.68 + n2 * 0.32;
+    const base = 100 + Math.floor(combined * 48);
+    // Subtle dark pebble speckles
+    const isPebble = n1 > 0.88;
+    const isDarkPebble = n1 < 0.12;
+    if (isPebble) {
+      return [142, 102, 70, 255];
+    }
+    if (isDarkPebble) {
+      return [72, 48, 30, 255];
+    }
+    const r = Math.floor(base * 0.95);
+    const g = Math.floor(base * 0.68);
+    const b = Math.floor(base * 0.46);
     return [r, g, b, 255];
   };
 
@@ -216,26 +230,43 @@ export function createBlockAtlas(): THREE.CanvasTexture {
     return [v, v, v, 255];
   };
 
-  // 3. Grass Top
+  // 3. Grass Top (Authentic vibrant lush Minecraft plains grass)
   drawTile(ctx, TileIndex.GRASS_TOP, (x, y) => {
-    const n = pseudoRandom(x, y, 30);
-    const g = 135 + Math.floor(n * 55);
-    const r = Math.floor(g * 0.45);
-    const b = Math.floor(g * 0.25);
-    return [r, g, b, 255];
+    const n1 = pseudoRandom(x, y, 77);
+    const n2 = pseudoRandom(Math.floor(x / 2), Math.floor(y / 2), 123);
+    const n = n1 * 0.65 + n2 * 0.35;
+    // Rich Minecraft plains green palette (#6cb23e / #80cc48 / #528a2c)
+    const g = 150 + Math.floor(n * 64);
+    const r = Math.floor(g * 0.58 + (n1 - 0.5) * 10);
+    const b = Math.floor(g * 0.30 + (n1 - 0.5) * 8);
+    return [Math.min(255, r), Math.min(255, g), Math.min(255, b), 255];
   });
 
-  // 4. Grass Side
+  // 4. Grass Side (Iconic Minecraft hanging fringe with triangular drips over dirt)
   drawTile(ctx, TileIndex.GRASS_SIDE, (x, y) => {
-    const grassDepth = 3 + Math.floor(pseudoRandom(x, 1, 40) * 3);
+    // Determine realistic hanging grass blade depth per column
+    // Columns with extra drip lengths like authentic Minecraft
+    const drips = [3, 5, 4, 3, 6, 4, 3, 5, 3, 4, 6, 3, 4, 5, 3, 4];
+    const grassDepth = drips[x % 16];
+
     if (y < grassDepth) {
-      const n = pseudoRandom(x, y, 30);
-      const g = 135 + Math.floor(n * 55);
-      const r = Math.floor(g * 0.45);
-      const b = Math.floor(g * 0.25);
+      const n1 = pseudoRandom(x, y, 77);
+      const g = 145 + Math.floor(n1 * 60);
+      const r = Math.floor(g * 0.58);
+      const b = Math.floor(g * 0.30);
+      // Dark bottom fringe shadow rim where grass meets dirt
+      if (y === grassDepth - 1) {
+        return [Math.floor(r * 0.62), Math.floor(g * 0.64), Math.floor(b * 0.58), 255];
+      }
       return [r, g, b, 255];
     }
-    return getDirtPixel(x, y);
+
+    // Dirt base underneath, with slight shadow immediately under grass fringe
+    const dirtColor = getDirtPixel(x, y);
+    if (y === grassDepth) {
+      return [Math.floor(dirtColor[0] * 0.78), Math.floor(dirtColor[1] * 0.78), Math.floor(dirtColor[2] * 0.78), 255];
+    }
+    return dirtColor;
   });
 
   // 5. Dirt
@@ -1069,13 +1100,78 @@ export function createBlockAtlas(): THREE.CanvasTexture {
     return [Math.floor(g * 0.35), g, Math.floor(g * 0.15), 255];
   });
 
-  // Lantern
+  // Lantern (Authentic Minecraft iron cage with warm glowing amber core)
   drawTile(ctx, TileIndex.LANTERN, (x, y) => {
-    const isFrame = x === 2 || x === 13 || y === 2 || y === 13;
-    const isCore = x >= 5 && x <= 10 && y >= 5 && y <= 10;
-    if (isFrame) return [60, 60, 65, 255];
-    if (isCore) return [255, 215, 80, 255];
-    return [220, 150, 50, 220];
+    // Top chain loop & mounting ring
+    if ((x === 7 || x === 8) && (y === 0 || y === 1)) return [48, 52, 58, 255];
+    // Top cap & base
+    if ((y === 2 || y === 14) && x >= 4 && x <= 11) return [68, 72, 80, 255];
+    // Corner posts
+    if ((x === 4 || x === 11) && y >= 3 && y <= 13) return [54, 58, 64, 255];
+    // Inside the glass
+    if (x >= 5 && x <= 10 && y >= 3 && y <= 13) {
+      const isInnerCore = x >= 7 && x <= 8 && y >= 7 && y <= 9;
+      const isFlame = x >= 6 && x <= 9 && y >= 6 && y <= 10;
+      if (isInnerCore) return [255, 250, 180, 255]; // Incandescent white-yellow
+      if (isFlame) return [255, 185, 45, 255]; // Golden flame
+      return [235, 145, 40, 215]; // Warm ambient lantern glass
+    }
+    return [0, 0, 0, 0];
+  });
+
+  // Soul Lantern (Dark iron with mystical turquoise soul flame)
+  drawTile(ctx, TileIndex.SOUL_LANTERN, (x, y) => {
+    if ((x === 7 || x === 8) && (y === 0 || y === 1)) return [35, 42, 48, 255];
+    if ((y === 2 || y === 14) && x >= 4 && x <= 11) return [45, 54, 62, 255];
+    if ((x === 4 || x === 11) && y >= 3 && y <= 13) return [38, 46, 54, 255];
+    if (x >= 5 && x <= 10 && y >= 3 && y <= 13) {
+      const isInnerCore = x >= 7 && x <= 8 && y >= 7 && y <= 9;
+      const isFlame = x >= 6 && x <= 9 && y >= 6 && y <= 10;
+      if (isInnerCore) return [190, 255, 255, 255]; // Pure bright cyan core
+      if (isFlame) return [52, 220, 245, 255]; // Soul flame cyan
+      return [24, 150, 195, 215]; // Glowing glass
+    }
+    return [0, 0, 0, 0];
+  });
+
+  // Candle (Cream ivory wax cylinder with wick and flickering teardrop flame)
+  drawTile(ctx, TileIndex.CANDLE, (x, y) => {
+    // Teardrop flame
+    if (y === 2 && (x === 7 || x === 8)) return [255, 160, 30, 255];
+    if (y === 3 && x >= 6 && x <= 9) {
+      if (x === 7 || x === 8) return [255, 250, 180, 255];
+      return [255, 180, 40, 255];
+    }
+    if (y === 4 && (x === 7 || x === 8)) return [255, 200, 50, 255];
+    // Dark wick
+    if ((y === 5 || y === 6) && (x === 7 || x === 8)) return [35, 35, 35, 255];
+    // Wax body with wax drip
+    if (x >= 6 && x <= 9 && y >= 7 && y <= 15) {
+      const isShade = x === 9 || y === 15;
+      if (isShade) return [215, 204, 178, 255];
+      return [236, 228, 206, 255];
+    }
+    // Wax drip bead
+    if (x === 5 && (y === 9 || y === 10)) return [228, 218, 194, 255];
+    return [0, 0, 0, 0];
+  });
+
+  // Soul Candle (Pale wax with brilliant cyan soul flame)
+  drawTile(ctx, TileIndex.SOUL_CANDLE, (x, y) => {
+    if (y === 2 && (x === 7 || x === 8)) return [40, 180, 220, 255];
+    if (y === 3 && x >= 6 && x <= 9) {
+      if (x === 7 || x === 8) return [200, 255, 255, 255];
+      return [50, 215, 245, 255];
+    }
+    if (y === 4 && (x === 7 || x === 8)) return [35, 190, 230, 255];
+    if ((y === 5 || y === 6) && (x === 7 || x === 8)) return [30, 30, 30, 255];
+    if (x >= 6 && x <= 9 && y >= 7 && y <= 15) {
+      const isShade = x === 9 || y === 15;
+      if (isShade) return [175, 195, 205, 255];
+      return [205, 220, 228, 255];
+    }
+    if (x === 5 && (y === 9 || y === 10)) return [195, 212, 220, 255];
+    return [0, 0, 0, 0];
   });
 
   // Red Mushroom & Brown Mushroom & Blue Orchid
@@ -1371,6 +1467,12 @@ export function getTileIndexForFace(
       return TileIndex.TERRACOTTA_WHITE;
     case BlockType.RED_SAND:
       return TileIndex.RED_SAND;
+    case BlockType.SOUL_LANTERN:
+      return TileIndex.SOUL_LANTERN;
+    case BlockType.CANDLE:
+      return TileIndex.CANDLE;
+    case BlockType.SOUL_CANDLE:
+      return TileIndex.SOUL_CANDLE;
     default:
       return TileIndex.STONE;
   }
@@ -1717,10 +1819,81 @@ export function getItemIcon(itemId: ItemId): string {
     ctx.fillRect(8, 6, 4, 8);
     ctx.fillRect(16, 14, 4, 8);
   } else if (itemId === 'lantern') {
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = '#334155';
     ctx.fillRect(8, 6, 16, 20);
-    ctx.fillStyle = '#fbbf24';
+    ctx.fillStyle = '#f59e0b';
     ctx.fillRect(10, 10, 12, 12);
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(13, 13, 6, 6);
+  } else if (itemId === 'soul_lantern') {
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(8, 6, 16, 20);
+    ctx.fillStyle = '#06b6d4';
+    ctx.fillRect(10, 10, 12, 12);
+    ctx.fillStyle = '#cffafe';
+    ctx.fillRect(13, 13, 6, 6);
+  } else if (itemId === 'candle') {
+    // Ivory wax cylinder
+    ctx.fillStyle = '#fef3c7';
+    ctx.fillRect(12, 14, 8, 14);
+    // Wick
+    ctx.fillStyle = '#1c1917';
+    ctx.fillRect(15, 10, 2, 4);
+    // Teardrop warm flame
+    ctx.fillStyle = '#f97316';
+    ctx.fillRect(14, 6, 4, 4);
+    ctx.fillStyle = '#fde047';
+    ctx.fillRect(15, 4, 2, 4);
+  } else if (itemId === 'soul_candle') {
+    // Pale bluish wax
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(12, 14, 8, 14);
+    // Wick
+    ctx.fillStyle = '#1c1917';
+    ctx.fillRect(15, 10, 2, 4);
+    // Cyan soul flame
+    ctx.fillStyle = '#0891b2';
+    ctx.fillRect(14, 6, 4, 4);
+    ctx.fillStyle = '#67e8f9';
+  } else if (itemId === 'raw_chicken') {
+    ctx.fillStyle = '#fca5a5';
+    ctx.fillRect(8, 10, 16, 12);
+    ctx.fillStyle = '#fef2f2';
+    ctx.fillRect(6, 16, 6, 6);
+  } else if (itemId === 'cooked_chicken') {
+    ctx.fillStyle = '#b45309';
+    ctx.fillRect(8, 8, 16, 14);
+    ctx.fillStyle = '#fef3c7';
+    ctx.fillRect(6, 16, 6, 6);
+  } else if (itemId === 'egg') {
+    ctx.fillStyle = '#fef9c3';
+    ctx.beginPath();
+    ctx.ellipse(16, 16, 8, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ca8a04';
+    ctx.stroke();
+  } else if (itemId === 'wheat') {
+    ctx.fillStyle = '#eab308';
+    ctx.fillRect(14, 6, 4, 18);
+    ctx.fillStyle = '#ca8a04';
+    ctx.fillRect(10, 8, 12, 4);
+    ctx.fillRect(10, 14, 12, 4);
+  } else if (itemId === 'seeds') {
+    ctx.fillStyle = '#65a30d';
+    ctx.fillRect(10, 12, 3, 4);
+    ctx.fillRect(16, 10, 3, 4);
+    ctx.fillRect(14, 18, 3, 4);
+    ctx.fillRect(19, 16, 3, 4);
+  } else if (itemId === 'carrot') {
+    ctx.fillStyle = '#ea580c';
+    ctx.beginPath();
+    ctx.moveTo(12, 8);
+    ctx.lineTo(20, 8);
+    ctx.lineTo(16, 26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#16a34a';
+    ctx.fillRect(14, 4, 4, 4);
   } else if (itemId.includes('planks')) {
     const woodColors: Record<string, string> = {
       jungle_planks: '#b45309',

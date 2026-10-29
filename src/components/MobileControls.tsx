@@ -69,10 +69,10 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
 
   return (
     <div className="fixed inset-0 pointer-events-none select-none z-30">
-      {/* LEFT SIDE: D-Pad, Sprint & Camera Turn Left */}
-      <div className="fixed bottom-3 left-3 pointer-events-auto flex flex-col items-center select-none">
-        {/* Quick Turn Left & Undo buttons above D-Pad */}
-        <div className="flex items-center gap-1.5 mb-2 w-full justify-start">
+      {/* LEFT SIDE: Compact Authentic Minecraft D-Pad Cluster */}
+      <div className="fixed bottom-2 left-2 sm:bottom-3 sm:left-3 pointer-events-auto flex flex-col items-start select-none">
+        {/* Quick Micro Turn Left, Undo, Sprint */}
+        <div className="flex items-center gap-1 mb-1.5">
           <button
             onTouchStart={(e) => {
               e.preventDefault();
@@ -80,27 +80,26 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               sounds.playPop();
             }}
             onClick={() => onRotateCamera(0.45)}
-            className="w-8 h-8 mc-btn flex items-center justify-center text-xs font-bold active:scale-95 text-white bg-black/60 border border-white/30 rounded"
+            className="w-7 h-7 mc-btn flex items-center justify-center text-[10px] font-bold active:scale-95 text-white/90 bg-black/40 border border-white/20 rounded shadow-xs backdrop-blur-[2px]"
             title="Turn Camera Left"
           >
             ↺
           </button>
 
-          <button
-            onTouchStart={(e) => {
-              e.preventDefault();
-              if (canUndo) {
+          {canUndo && (
+            <button
+              onTouchStart={(e) => {
+                e.preventDefault();
                 onUndo();
                 sounds.playPop();
-              }
-            }}
-            onClick={() => canUndo && onUndo()}
-            disabled={!canUndo}
-            className="w-8 h-8 mc-btn flex items-center justify-center text-xs font-bold active:scale-95 disabled:opacity-40 bg-black/60 border border-white/30 rounded"
-            title="Undo Build"
-          >
-            ↩
-          </button>
+              }}
+              onClick={() => onUndo()}
+              className="w-7 h-7 mc-btn flex items-center justify-center text-[10px] font-bold active:scale-95 text-white/90 bg-black/40 border border-white/20 rounded shadow-xs backdrop-blur-[2px]"
+              title="Undo Build"
+            >
+              ↩
+            </button>
+          )}
 
           <button
             onTouchStart={(e) => {
@@ -108,10 +107,10 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               toggleSprint();
             }}
             onClick={toggleSprint}
-            className={`px-2 h-8 rounded text-[10px] font-bold border transition-all ${
+            className={`px-1.5 h-7 rounded text-[9px] font-bold border transition-all backdrop-blur-[2px] ${
               isSprinting
-                ? 'bg-orange-600 text-white border-orange-300 shadow-md'
-                : 'bg-black/60 text-gray-300 border-white/30'
+                ? 'bg-orange-600/80 text-white border-orange-300 shadow-xs'
+                : 'bg-black/40 text-gray-300 border-white/20'
             }`}
             title="Toggle Sprint Run"
           >
@@ -119,12 +118,12 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           </button>
         </div>
 
-        {/* Authentic Minecraft D-Pad Cluster (W, A, S, D) */}
-        <div className="relative w-32 h-32 select-none touch-none">
-          {/* Background circle */}
-          <div className="absolute inset-0 rounded-full bg-black/45 border-2 border-white/20 backdrop-blur-xs pointer-events-none" />
+        {/* Compact Translucent D-Pad (24x24 = 96px on mobile, leaving maximum game visibility) */}
+        <div className="relative w-24 h-24 sm:w-28 sm:h-28 select-none touch-none">
+          {/* Subtle translucent background circle */}
+          <div className="absolute inset-0 rounded-full bg-black/25 border border-white/15 backdrop-blur-[2px] pointer-events-none" />
 
-          {/* FORWARD: Key W */}
+          {/* FORWARD (W) */}
           <button
             onTouchStart={(e) => {
               e.preventDefault();
@@ -141,17 +140,16 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
             onMouseDown={() => handleTouchDown('w', 'KeyW')}
             onMouseUp={() => handleTouchUp('w', 'KeyW')}
             onMouseLeave={() => handleTouchUp('w', 'KeyW')}
-            className={`absolute top-0 left-10 w-12 h-11 rounded-t-lg flex flex-col items-center justify-center font-bold text-white transition-all shadow-md ${
+            className={`absolute top-0 left-7 sm:left-9 w-10 sm:w-10 h-8 sm:h-9 rounded-t-md flex flex-col items-center justify-center font-bold text-white transition-all shadow-xs ${
               activeKeys['w']
-                ? 'bg-white/50 scale-95 border-2 border-yellow-300'
-                : 'bg-[#4a4a4a]/90 hover:bg-[#5a5a5a] border-t-2 border-x-2 border-[#777]'
+                ? 'bg-white/40 scale-95 border-2 border-yellow-300'
+                : 'bg-black/40 hover:bg-black/50 border-t border-x border-white/25'
             }`}
           >
-            <span className="text-sm leading-none">▲</span>
-            <span className="text-[9px] text-yellow-300 font-mono">W</span>
+            <span className="text-xs leading-none">▲</span>
           </button>
 
-          {/* STRAFE LEFT: Key A */}
+          {/* STRAFE LEFT (A) */}
           <button
             onTouchStart={(e) => {
               e.preventDefault();
@@ -168,34 +166,33 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
             onMouseDown={() => handleTouchDown('a', 'KeyA')}
             onMouseUp={() => handleTouchUp('a', 'KeyA')}
             onMouseLeave={() => handleTouchUp('a', 'KeyA')}
-            className={`absolute top-10 left-0 w-11 h-12 rounded-l-lg flex flex-row items-center justify-center gap-0.5 font-bold text-white transition-all shadow-md ${
+            className={`absolute top-7 sm:top-9 left-0 w-8 sm:w-9 h-10 sm:h-10 rounded-l-md flex items-center justify-center font-bold text-white transition-all shadow-xs ${
               activeKeys['a']
-                ? 'bg-white/50 scale-95 border-2 border-yellow-300'
-                : 'bg-[#4a4a4a]/90 hover:bg-[#5a5a5a] border-l-2 border-y-2 border-[#777]'
+                ? 'bg-white/40 scale-95 border-2 border-yellow-300'
+                : 'bg-black/40 hover:bg-black/50 border-l border-y border-white/25'
             }`}
           >
-            <span className="text-sm leading-none">◀</span>
-            <span className="text-[9px] text-yellow-300 font-mono">A</span>
+            <span className="text-xs leading-none">◀</span>
           </button>
 
-          {/* CENTER BUTTON: Sneak Toggle */}
+          {/* SNEAK CENTER BUTTON */}
           <button
             onTouchStart={(e) => {
               e.preventDefault();
               toggleSneak();
             }}
             onClick={toggleSneak}
-            className={`absolute top-10 left-10 w-12 h-12 flex items-center justify-center font-bold text-[9px] transition-all ${
+            className={`absolute top-7 sm:top-9 left-7 sm:left-9 w-10 sm:w-10 h-10 sm:h-10 flex items-center justify-center font-bold text-[8px] transition-all rounded-xs ${
               isSneaking
-                ? 'bg-yellow-500 text-black border-2 border-white'
-                : 'bg-[#333333]/90 text-gray-300 hover:bg-[#444] border border-[#555]'
+                ? 'bg-yellow-500/80 text-black border border-white'
+                : 'bg-black/50 text-gray-300 hover:bg-black/60 border border-white/20'
             }`}
             title="Sneak / Crouch Toggle"
           >
             {isSneaking ? 'SNEAK' : '●'}
           </button>
 
-          {/* STRAFE RIGHT: Key D */}
+          {/* STRAFE RIGHT (D) */}
           <button
             onTouchStart={(e) => {
               e.preventDefault();
@@ -212,17 +209,16 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
             onMouseDown={() => handleTouchDown('d', 'KeyD')}
             onMouseUp={() => handleTouchUp('d', 'KeyD')}
             onMouseLeave={() => handleTouchUp('d', 'KeyD')}
-            className={`absolute top-10 right-0 w-11 h-12 rounded-r-lg flex flex-row items-center justify-center gap-0.5 font-bold text-white transition-all shadow-md ${
+            className={`absolute top-7 sm:top-9 right-0 w-8 sm:w-9 h-10 sm:h-10 rounded-r-md flex items-center justify-center font-bold text-white transition-all shadow-xs ${
               activeKeys['d']
-                ? 'bg-white/50 scale-95 border-2 border-yellow-300'
-                : 'bg-[#4a4a4a]/90 hover:bg-[#5a5a5a] border-r-2 border-y-2 border-[#777]'
+                ? 'bg-white/40 scale-95 border-2 border-yellow-300'
+                : 'bg-black/40 hover:bg-black/50 border-r border-y border-white/25'
             }`}
           >
-            <span className="text-[9px] text-yellow-300 font-mono">D</span>
-            <span className="text-sm leading-none">▶</span>
+            <span className="text-xs leading-none">▶</span>
           </button>
 
-          {/* BACKWARD: Key S */}
+          {/* BACKWARD (S) */}
           <button
             onTouchStart={(e) => {
               e.preventDefault();
@@ -239,22 +235,21 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
             onMouseDown={() => handleTouchDown('s', 'KeyS')}
             onMouseUp={() => handleTouchUp('s', 'KeyS')}
             onMouseLeave={() => handleTouchUp('s', 'KeyS')}
-            className={`absolute bottom-0 left-10 w-12 h-11 rounded-b-lg flex flex-col items-center justify-center font-bold text-white transition-all shadow-md ${
+            className={`absolute bottom-0 left-7 sm:left-9 w-10 sm:w-10 h-8 sm:h-9 rounded-b-md flex flex-col items-center justify-center font-bold text-white transition-all shadow-xs ${
               activeKeys['s']
-                ? 'bg-white/50 scale-95 border-2 border-yellow-300'
-                : 'bg-[#4a4a4a]/90 hover:bg-[#5a5a5a] border-b-2 border-x-2 border-[#777]'
+                ? 'bg-white/40 scale-95 border-2 border-yellow-300'
+                : 'bg-black/40 hover:bg-black/50 border-b border-x border-white/25'
             }`}
           >
-            <span className="text-[9px] text-yellow-300 font-mono">S</span>
-            <span className="text-sm leading-none">▼</span>
+            <span className="text-xs leading-none">▼</span>
           </button>
         </div>
       </div>
 
-      {/* RIGHT SIDE: Action Buttons (Mine, Place, Jump, Fly Down) */}
-      <div className="fixed bottom-3 right-3 pointer-events-auto flex flex-col items-end select-none">
-        {/* Quick Turn Right & Dismount buttons above action cluster */}
-        <div className="flex items-center gap-1.5 mb-2">
+      {/* RIGHT SIDE: Compact Action Buttons (Mine, Place, Jump, Fly Down) */}
+      <div className="fixed bottom-2 right-2 sm:bottom-3 sm:right-3 pointer-events-auto flex flex-col items-end select-none">
+        {/* Turn Right & Vehicle Exit mini bar */}
+        <div className="flex items-center gap-1 mb-1.5">
           {isMounted && (
             <button
               onTouchStart={(e) => {
@@ -263,7 +258,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
                 sounds.playPop();
               }}
               onClick={onDismount}
-              className="px-2 h-8 bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] rounded border border-red-300 active:scale-95 shadow"
+              className="px-1.5 h-7 bg-red-600/80 hover:bg-red-500 text-white font-bold text-[9px] rounded border border-red-300 active:scale-95 shadow-xs"
             >
               Exit Vehicle
             </button>
@@ -276,16 +271,16 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               sounds.playPop();
             }}
             onClick={() => onRotateCamera(-0.45)}
-            className="w-8 h-8 mc-btn flex items-center justify-center text-xs font-bold active:scale-95 text-white bg-black/60 border border-white/30 rounded"
+            className="w-7 h-7 mc-btn flex items-center justify-center text-[10px] font-bold active:scale-95 text-white/90 bg-black/40 border border-white/20 rounded shadow-xs backdrop-blur-[2px]"
             title="Turn Camera Right"
           >
             ↻
           </button>
         </div>
 
-        {/* Action Buttons Row 1: MINE & PLACE */}
-        <div className="flex items-center gap-2 mb-2">
-          {/* INSTANT MINE BUTTON (Tap or Hold to break block instantly in Creative) */}
+        {/* Row 1: MINE & PLACE Buttons (Compact 40px translucent discs) */}
+        <div className="flex items-center gap-1.5 mb-1.5">
+          {/* MINE BUTTON */}
           <button
             onTouchStart={(e) => {
               e.preventDefault();
@@ -310,18 +305,18 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               setIsMiningActive(false);
               onMineStop();
             }}
-            className={`w-13 h-13 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-xl transition-all border-2 ${
+            className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-lg transition-all border backdrop-blur-[2px] ${
               isMiningActive
-                ? 'bg-red-700/90 border-red-300 scale-95 animate-pulse'
-                : 'bg-gradient-to-b from-[#7f1d1d]/90 to-[#450a0a]/90 border-red-400/80 hover:bg-red-800'
+                ? 'bg-red-700/80 border-red-300 scale-95 animate-pulse'
+                : 'bg-red-950/50 hover:bg-red-900/60 border-red-400/50'
             }`}
             title="Instant Break Block / Attack"
           >
-            <span className="text-base leading-none">⛏️</span>
-            <span className="text-[8px] font-bold tracking-tight text-red-200">MINE</span>
+            <span className="text-sm leading-none">⛏️</span>
+            <span className="text-[7px] font-bold tracking-tight text-red-200">MINE</span>
           </button>
 
-          {/* PLACE / USE BUTTON */}
+          {/* PLACE BUTTON */}
           <button
             onTouchStart={(e) => {
               e.preventDefault();
@@ -332,16 +327,16 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               onInteract();
               sounds.playPop();
             }}
-            className="w-13 h-13 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-xl transition-all border-2 bg-gradient-to-b from-[#14532d]/90 to-[#052e16]/90 border-green-400/80 active:scale-95 hover:bg-green-800"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-lg transition-all border bg-emerald-950/50 hover:bg-emerald-900/60 border-emerald-400/50 active:scale-95 backdrop-blur-[2px]"
             title="Place Block / Interact"
           >
-            <span className="text-base leading-none">🧱</span>
-            <span className="text-[8px] font-bold tracking-tight text-green-200">PLACE</span>
+            <span className="text-sm leading-none">🧱</span>
+            <span className="text-[7px] font-bold tracking-tight text-green-200">PLACE</span>
           </button>
         </div>
 
-        {/* Action Buttons Row 2: Fly Down & JUMP */}
-        <div className="flex items-center gap-2">
+        {/* Row 2: Fly Down & JUMP */}
+        <div className="flex items-center gap-1.5">
           {/* Fly Down Button (shown when flying) */}
           {isFlying && (
             <button
@@ -359,15 +354,15 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
               }}
               onMouseDown={() => handleTouchDown('shift', 'ShiftLeft')}
               onMouseUp={() => handleTouchUp('shift', 'ShiftLeft')}
-              className={`w-11 h-11 rounded-full flex flex-col items-center justify-center font-bold text-white border-2 transition-all shadow-md ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex flex-col items-center justify-center font-bold text-white border transition-all shadow-xs backdrop-blur-[2px] ${
                 activeKeys['shift']
-                  ? 'bg-cyan-500 scale-95 border-white'
-                  : 'bg-black/70 border-cyan-400/60'
+                  ? 'bg-cyan-600/80 scale-95 border-white'
+                  : 'bg-black/40 border-cyan-400/40'
               }`}
               title="Fly Down"
             >
-              <span className="text-xs">⮟</span>
-              <span className="text-[7px] text-cyan-200">DOWN</span>
+              <span className="text-xs leading-none">▼</span>
+              <span className="text-[6px] text-cyan-200">DOWN</span>
             </button>
           )}
 
@@ -387,15 +382,15 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
             }}
             onMouseDown={() => handleTouchDown('space', 'Space')}
             onMouseUp={() => handleTouchUp('space', 'Space')}
-            className={`w-14 h-14 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-2xl transition-all border-2 ${
+            className={`w-11 h-11 sm:w-13 sm:h-13 rounded-full flex flex-col items-center justify-center font-bold text-white shadow-xl transition-all border backdrop-blur-[2px] ${
               activeKeys['space']
-                ? 'bg-yellow-500/90 text-black border-white scale-95'
-                : 'bg-[#444]/90 border-white/60 hover:bg-[#555]'
+                ? 'bg-yellow-500/80 text-black border-white scale-95'
+                : 'bg-black/45 border-white/40 hover:bg-black/60'
             }`}
             title="Jump / Fly Up / Swim"
           >
-            <span className="text-lg leading-none">⮝</span>
-            <span className="text-[9px] font-bold tracking-wide">JUMP</span>
+            <span className="text-sm sm:text-base leading-none">▲</span>
+            <span className="text-[7px] sm:text-[8px] font-bold tracking-wide">JUMP</span>
           </button>
         </div>
       </div>

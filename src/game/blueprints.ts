@@ -27,6 +27,307 @@ export interface StructureTemplate {
 
 export const STRUCTURES: StructureTemplate[] = [
   {
+    id: 'real_modern_megacity',
+    name: '🏙️ Real Modern Megacity',
+    description: 'Realistic modern metropolis with dual high-rise skyscrapers, asphalt grand avenue, pedestrian crosswalks, glowing streetlamps, central plaza fountain, park trees, and parked sports car.',
+    icon: '🏙️',
+    width: 32,
+    height: 24,
+    depth: 32,
+    generate: () => {
+      const blocks: StructureBlock[] = [];
+      const W = 32;
+      const D = 32;
+
+      // Helper to push block
+      const add = (dx: number, dy: number, dz: number, type: BlockType) => {
+        blocks.push({ dx, dy, dz, type });
+      };
+
+      // 1. Foundation Ground Layer (dy = 0)
+      for (let x = 0; x < W; x++) {
+        for (let z = 0; z < D; z++) {
+          const isMainAvenue = x >= 11 && x <= 19;
+          const isCrossStreet = z >= 13 && z <= 17;
+
+          if (isMainAvenue || isCrossStreet) {
+            // Road Surface
+            const isCenterDash =
+              (x === 15 && isMainAvenue && !isCrossStreet && (z % 4 === 1 || z % 4 === 2)) ||
+              (z === 15 && isCrossStreet && !isMainAvenue && (x % 4 === 1 || x % 4 === 2));
+
+            // Pedestrian Zebra Crosswalks near intersections
+            const isZebraNorth = (z === 11 || z === 12) && isMainAvenue && x % 2 === 1;
+            const isZebraSouth = (z === 18 || z === 19) && isMainAvenue && x % 2 === 1;
+            const isZebraWest = (x === 9 || x === 10) && isCrossStreet && z % 2 === 1;
+            const isZebraEast = (x === 20 || x === 21) && isCrossStreet && z % 2 === 1;
+
+            if (isCenterDash || isZebraNorth || isZebraSouth || isZebraWest || isZebraEast) {
+              add(x, 0, z, BlockType.WHITE_CONCRETE);
+            } else {
+              add(x, 0, z, BlockType.BLACK_CONCRETE);
+            }
+          } else {
+            // Raised Sidewalks and Building Plazas
+            const isCurb =
+              x === 10 || x === 20 || z === 12 || z === 18;
+            if (isCurb) {
+              add(x, 0, z, BlockType.STONE_BRICKS);
+            } else {
+              add(x, 0, z, BlockType.SMOOTH_STONE);
+            }
+          }
+        }
+      }
+
+      // 2. Modern Streetlamps with warm glowing Lanterns
+      const lampSpots = [
+        { x: 10, z: 4 },
+        { x: 20, z: 4 },
+        { x: 10, z: 10 },
+        { x: 20, z: 10 },
+        { x: 10, z: 20 },
+        { x: 20, z: 20 },
+        { x: 10, z: 27 },
+        { x: 20, z: 27 },
+      ];
+      for (const lamp of lampSpots) {
+        // Vertical post
+        for (let y = 1; y <= 3; y++) {
+          add(lamp.x, y, lamp.z, BlockType.STONE_BRICKS);
+        }
+        add(lamp.x, 4, lamp.z, BlockType.IRON_BLOCK);
+        // Overhanging arm pointing toward street
+        const armDir = lamp.x === 10 ? 1 : -1;
+        add(lamp.x + armDir, 4, lamp.z, BlockType.STONE_BRICKS);
+        // Glowing Lantern
+        add(lamp.x + armDir, 3, lamp.z, BlockType.LANTERN);
+      }
+
+      // 3. Skyscraper A: Corporate Glass Tower (x: 1..9, z: 1..11, height 22)
+      const towerHeight = 22;
+      for (let y = 1; y <= towerHeight; y++) {
+        for (let x = 1; x <= 9; x++) {
+          for (let z = 1; z <= 11; z++) {
+            const isEdgeX = x === 1 || x === 9;
+            const isEdgeZ = z === 1 || z === 11;
+            const isCorner = isEdgeX && isEdgeZ;
+            const isPerimeter = isEdgeX || isEdgeZ;
+            const isFloorSlab = y % 4 === 0;
+
+            if (isCorner) {
+              // Solid Quartz Structural Columns
+              add(x, y, z, BlockType.QUARTZ_BLOCK);
+            } else if (isFloorSlab) {
+              // Inter-floor concrete slabs
+              add(x, y, z, BlockType.SMOOTH_STONE);
+              // Ceiling light at center
+              if (x === 5 && z === 6) {
+                add(x, y, z, BlockType.SEA_LANTERN);
+              }
+            } else if (isPerimeter) {
+              if (y === 1 && z === 11 && (x === 4 || x === 5 || x === 6)) {
+                // Glass Entrance Doors
+                add(x, y, z, BlockType.AIR);
+              } else if (y === 1) {
+                // Ground Floor Lobby Wall
+                add(x, y, z, BlockType.QUARTZ_BLOCK);
+              } else {
+                // Floor-to-Ceiling Cyan Ribbon Glass Windows
+                add(x, y, z, BlockType.STAINED_GLASS_CYAN);
+              }
+            } else {
+              // Interior office floors
+              add(x, y, z, BlockType.AIR);
+            }
+          }
+        }
+      }
+
+      // Skyscraper A Rooftop: Helipad & Antenna
+      const roofY = towerHeight + 1;
+      for (let x = 1; x <= 9; x++) {
+        for (let z = 1; z <= 11; z++) {
+          const isParapet = x === 1 || x === 9 || z === 1 || z === 11;
+          if (isParapet) {
+            add(x, roofY, z, BlockType.QUARTZ_BLOCK);
+          } else {
+            // Helipad Surface (Black asphalt with yellow 'H')
+            const isH =
+              (x === 4 && z >= 4 && z <= 8) ||
+              (x === 6 && z >= 4 && z <= 8) ||
+              (z === 6 && x >= 4 && x <= 6);
+            if (isH) {
+              add(x, roofY, z, BlockType.YELLOW_CONCRETE);
+            } else {
+              add(x, roofY, z, BlockType.BLACK_CONCRETE);
+            }
+          }
+        }
+      }
+      // Rooftop Communication Antenna
+      for (let ay = 1; ay <= 4; ay++) {
+        add(2, roofY + ay, 2, BlockType.IRON_BLOCK);
+      }
+      add(2, roofY + 5, 2, BlockType.TORCH);
+
+      // 4. Skyscraper B: Luxury Residential High-Rise (x: 1..9, z: 19..30, height 16)
+      const resHeight = 16;
+      for (let y = 1; y <= resHeight; y++) {
+        for (let x = 1; x <= 9; x++) {
+          for (let z = 19; z <= 30; z++) {
+            const isEdgeX = x === 1 || x === 9;
+            const isEdgeZ = z === 19 || z === 30;
+            const isCorner = isEdgeX && isEdgeZ;
+            const isPerimeter = isEdgeX || isEdgeZ;
+            const isFloorSlab = y % 3 === 0;
+
+            if (isCorner) {
+              add(x, y, z, BlockType.WHITE_CONCRETE);
+            } else if (isFloorSlab) {
+              add(x, y, z, BlockType.WHITE_CONCRETE);
+            } else if (isPerimeter) {
+              // Balcony glass cuts and brick architecture
+              const isBalconyWindow = (z === 22 || z === 27) && !isEdgeX;
+              if (isBalconyWindow) {
+                add(x, y, z, BlockType.GLASS);
+              } else {
+                add(x, y, z, BlockType.BRICKS);
+              }
+            } else {
+              add(x, y, z, BlockType.AIR);
+            }
+          }
+        }
+      }
+
+      // Skyscraper B Rooftop: Penthouse Garden Terrace
+      const resRoofY = resHeight + 1;
+      for (let x = 1; x <= 9; x++) {
+        for (let z = 19; z <= 30; z++) {
+          const isParapet = x === 1 || x === 9 || z === 19 || z === 30;
+          if (isParapet) {
+            add(x, resRoofY, z, BlockType.GLASS);
+          } else {
+            add(x, resRoofY, z, BlockType.SMOOTH_STONE);
+          }
+        }
+      }
+      // Rooftop Garden patches & Candlelit Lounge
+      add(3, resRoofY + 1, 22, BlockType.GRASS);
+      add(3, resRoofY + 2, 22, BlockType.POPPY);
+      add(7, resRoofY + 1, 22, BlockType.GRASS);
+      add(7, resRoofY + 2, 22, BlockType.DANDELION);
+      add(5, resRoofY + 1, 27, BlockType.OAK_PLANKS); // Terrace Table
+      add(5, resRoofY + 2, 27, BlockType.CANDLE); // Lit Candle on Table
+      add(4, resRoofY + 1, 27, BlockType.OAK_PLANKS); // Chair
+      add(6, resRoofY + 1, 27, BlockType.OAK_PLANKS); // Chair
+
+      // 5. Central Plaza with 5x5 Tiered Fountain (x: 22..30, z: 1..11)
+      // Plaza pavement
+      for (let x = 22; x <= 30; x++) {
+        for (let z = 1; z <= 11; z++) {
+          add(x, 1, z, BlockType.STONE_BRICKS);
+        }
+      }
+      // Water Fountain at center (x: 24..28, z: 4..8)
+      for (let fx = 24; fx <= 28; fx++) {
+        for (let fz = 4; fz <= 8; fz++) {
+          const isBorder = fx === 24 || fx === 28 || fz === 4 || fz === 8;
+          if (isBorder) {
+            add(fx, 2, fz, BlockType.STONE_BRICKS);
+          } else {
+            add(fx, 2, fz, BlockType.WATER);
+          }
+        }
+      }
+      // Center Fountain Spout & Glowstone core
+      add(26, 2, 6, BlockType.GLOWSTONE);
+      add(26, 3, 6, BlockType.STONE_BRICKS);
+      add(26, 4, 6, BlockType.WATER);
+
+      // Urban Plaza Trees
+      const tree1 = { x: 23, z: 2 };
+      const tree2 = { x: 29, z: 10 };
+      for (const t of [tree1, tree2]) {
+        for (let ty = 2; ty <= 4; ty++) {
+          add(t.x, ty, t.z, BlockType.OAK_LOG);
+        }
+        for (let lx = -1; lx <= 1; lx++) {
+          for (let lz = -1; lz <= 1; lz++) {
+            add(t.x + lx, 4, t.z + lz, BlockType.OAK_LEAVES);
+            add(t.x + lx, 5, t.z + lz, BlockType.OAK_LEAVES);
+          }
+        }
+        add(t.x, 6, t.z, BlockType.OAK_LEAVES);
+      }
+      // Plaza flowerbeds & benches
+      add(23, 2, 6, BlockType.OAK_PLANKS); // Bench
+      add(29, 2, 6, BlockType.OAK_PLANKS); // Bench
+      add(23, 2, 10, BlockType.GRASS);
+      add(23, 3, 10, BlockType.BLUE_ORCHID);
+
+      // 6. Commercial Mall & Parking Bay (x: 22..30, z: 19..30)
+      // Building (x: 22..30, z: 24..30, height 6)
+      for (let y = 1; y <= 6; y++) {
+        for (let x = 22; x <= 30; x++) {
+          for (let z = 24; z <= 30; z++) {
+            const isEdgeX = x === 22 || x === 30;
+            const isEdgeZ = z === 24 || z === 30;
+            const isBorder = isEdgeX || isEdgeZ;
+            if (y === 6) {
+              add(x, y, z, BlockType.QUARTZ_BLOCK);
+            } else if (isBorder) {
+              if (z === 24 && (x === 25 || x === 26 || x === 27) && (y === 1 || y === 2)) {
+                add(x, y, z, BlockType.GLASS); // Storefront glass
+              } else {
+                add(x, y, z, BlockType.WHITE_CONCRETE);
+              }
+            } else {
+              add(x, y, z, BlockType.AIR);
+            }
+          }
+        }
+      }
+      // Store lighting
+      add(26, 5, 27, BlockType.SEA_LANTERN);
+
+      // Parking Lot Surface (x: 22..30, z: 19..23)
+      for (let x = 22; x <= 30; x++) {
+        for (let z = 19; z <= 23; z++) {
+          const isYellowStripe = x === 22 || x === 26 || x === 30;
+          if (isYellowStripe && z >= 19 && z <= 22) {
+            add(x, 1, z, BlockType.YELLOW_CONCRETE);
+          } else {
+            add(x, 1, z, BlockType.BLACK_CONCRETE);
+          }
+        }
+      }
+
+      // Parked Sleek Red Sports Car in parking bay (x: 23..25, z: 19..22)
+      // Wheels
+      add(23, 2, 19, BlockType.BLACK_CONCRETE);
+      add(25, 2, 19, BlockType.BLACK_CONCRETE);
+      add(23, 2, 22, BlockType.BLACK_CONCRETE);
+      add(25, 2, 22, BlockType.BLACK_CONCRETE);
+      // Car chassis & body
+      add(24, 2, 19, BlockType.RED_CONCRETE);
+      add(24, 2, 20, BlockType.RED_CONCRETE);
+      add(24, 2, 21, BlockType.RED_CONCRETE);
+      add(24, 2, 22, BlockType.RED_CONCRETE);
+      // Car cabin & windshield
+      add(24, 3, 20, BlockType.GLASS);
+      add(24, 3, 21, BlockType.RED_CONCRETE);
+      // Headlights & Taillights
+      add(23, 2, 18, BlockType.GLOWSTONE);
+      add(25, 2, 18, BlockType.GLOWSTONE);
+      add(23, 2, 23, BlockType.REDSTONE_BLOCK);
+      add(25, 2, 23, BlockType.REDSTONE_BLOCK);
+
+      return blocks;
+    },
+  },
+  {
     id: 'starter_cottage',
     name: 'Wooden Cottage',
     description: 'Cozy 7x5 wooden house with glass windows, plank roof, chest & crafting table.',

@@ -20,8 +20,8 @@ export class DayNightCycle {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    // 1. Directional Sun Key Light (Warm golden sunlight)
-    this.sunLight = new THREE.DirectionalLight(0xfff7e6, 1.45);
+    // 1. Directional Sun Key Light (Warm golden sunlight, enhanced brightness)
+    this.sunLight = new THREE.DirectionalLight(0xfffaec, 2.15);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 1024;
     this.sunLight.shadow.mapSize.height = 1024;
@@ -35,12 +35,12 @@ export class DayNightCycle {
     this.sunLight.shadow.bias = -0.0005;
     this.scene.add(this.sunLight);
 
-    // 2. Hemisphere Ambient Light (Authentic Minecraft sky-blue above, grass-tint below)
-    this.hemiLight = new THREE.HemisphereLight(0x78a7ff, 0x486432, 0.72);
+    // 2. Hemisphere Ambient Light (Authentic Minecraft daylight: sky-blue above, grass-tint below)
+    this.hemiLight = new THREE.HemisphereLight(0x8abaff, 0x567e37, 1.1);
     this.scene.add(this.hemiLight);
 
     // 3. Iconic Square Minecraft Sun
-    const sunGeom = new THREE.PlaneGeometry(20, 20);
+    const sunGeom = new THREE.PlaneGeometry(24, 24);
     const sunMat = new THREE.MeshBasicMaterial({
       color: 0xfffbe8,
       side: THREE.DoubleSide,
@@ -50,7 +50,7 @@ export class DayNightCycle {
     this.scene.add(this.sunMesh);
 
     // 4. Moon Billboard (hidden below world because night is disabled)
-    const moonGeom = new THREE.PlaneGeometry(12, 12);
+    const moonGeom = new THREE.PlaneGeometry(14, 14);
     const moonMat = new THREE.MeshBasicMaterial({
       color: 0xeeffff,
       side: THREE.DoubleSide,
@@ -75,25 +75,38 @@ export class DayNightCycle {
     this.starPoints = new THREE.Points(starGeom, starMat);
     this.scene.add(this.starPoints);
 
-    // 6. Procedural Authentic Minecraft Drifting Voxel Clouds
+    // 6. Procedural Authentic Minecraft Drifting Pixel Voxel Clouds
+    // Real Minecraft clouds are composed of 4x4 or 8x8 pixel blocks arranged in cumulus groups
     const cloudCanvas = document.createElement('canvas');
-    cloudCanvas.width = 64;
-    cloudCanvas.height = 64;
+    cloudCanvas.width = 128;
+    cloudCanvas.height = 128;
     const cctx = cloudCanvas.getContext('2d')!;
-    cctx.clearRect(0, 0, 64, 64);
+    cctx.clearRect(0, 0, 128, 128);
 
-    for (let y = 0; y < 64; y += 4) {
-      for (let x = 0; x < 64; x += 4) {
-        const val =
-          Math.sin(x * 0.22) * Math.cos(y * 0.22) +
-          Math.sin(x * 0.08 + y * 0.12) * 0.8 +
-          Math.cos(x * 0.15 - y * 0.05) * 0.4;
-        if (val > 0.1) {
-          cctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-          cctx.fillRect(x, y, 4, 4);
-          // Subtle darker bottom voxel border for 3D depth
-          cctx.fillStyle = 'rgba(215, 225, 240, 0.85)';
-          cctx.fillRect(x, y + 3, 4, 1);
+    const blockSize = 4;
+    const cols = 128 / blockSize;
+    const rows = 128 / blockSize;
+
+    for (let by = 0; by < rows; by++) {
+      for (let bx = 0; bx < cols; bx++) {
+        // Multi-frequency Minecraft cloud noise generating rectangular clusters
+        const nx = bx / cols;
+        const ny = by / rows;
+        const v1 = Math.sin(nx * Math.PI * 4) * Math.cos(ny * Math.PI * 3);
+        const v2 = Math.sin(nx * Math.PI * 8 + 1.2) * Math.sin(ny * Math.PI * 6 + 0.8) * 0.5;
+        const v3 = Math.cos((nx + ny) * Math.PI * 6) * 0.35;
+        const density = v1 + v2 + v3;
+
+        if (density > 0.08) {
+          const px = bx * blockSize;
+          const py = by * blockSize;
+          // Bright white main cloud body
+          cctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+          cctx.fillRect(px, py, blockSize, blockSize);
+
+          // Authentic Minecraft bottom shadow underbelly for 3D voxel effect
+          cctx.fillStyle = 'rgba(216, 228, 248, 0.90)';
+          cctx.fillRect(px, py + blockSize - 1, blockSize, 1);
         }
       }
     }
@@ -103,24 +116,24 @@ export class DayNightCycle {
     this.cloudTexture.minFilter = THREE.NearestFilter;
     this.cloudTexture.wrapS = THREE.RepeatWrapping;
     this.cloudTexture.wrapT = THREE.RepeatWrapping;
-    this.cloudTexture.repeat.set(16, 16);
+    this.cloudTexture.repeat.set(12, 12);
 
-    const cloudGeom = new THREE.PlaneGeometry(900, 900);
+    const cloudGeom = new THREE.PlaneGeometry(1400, 1400);
     const cloudMat = new THREE.MeshBasicMaterial({
       map: this.cloudTexture,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.94,
       side: THREE.DoubleSide,
       fog: false,
       depthWrite: false,
     });
     this.cloudMesh = new THREE.Mesh(cloudGeom, cloudMat);
     this.cloudMesh.rotation.x = Math.PI / 2;
-    this.cloudMesh.position.set(0, 120, 0);
+    this.cloudMesh.position.set(0, 126, 0);
     this.scene.add(this.cloudMesh);
 
-    // 7. Horizon Fog (Crisp Minecraft daytime blue)
-    this.scene.fog = new THREE.FogExp2(0x78a7ff, 0.012);
+    // 7. Horizon Fog (Crisp Minecraft daytime blue with clear view distance)
+    this.scene.fog = new THREE.FogExp2(0x7cb2ff, 0.0085);
   }
 
   public setTimeOfDay(_time: number) {
@@ -163,14 +176,14 @@ export class DayNightCycle {
     }
 
     // Authentic vibrant bright Minecraft Sky & Fog
-    const daySkyColor = new THREE.Color(0x78a7ff);
+    const daySkyColor = new THREE.Color(0x7cb2ff);
     this.scene.background = daySkyColor;
     if (this.scene.fog) {
       this.scene.fog.color.copy(daySkyColor);
     }
 
-    this.sunLight.intensity = 1.45;
-    this.hemiLight.intensity = 0.72;
+    this.sunLight.intensity = 2.15;
+    this.hemiLight.intensity = 1.1;
   }
 
   public dispose() {

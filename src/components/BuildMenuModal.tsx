@@ -25,7 +25,7 @@ interface BuildMenuModalProps {
   onSelectTool: (toolType: CreativeToolType) => void;
   onSelectCreativeItem: (itemId: ItemId) => void;
   onSpawnDriveableVehicle: (type: 'car' | 'bike' | 'boat') => void;
-  onSpawnMob: (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper') => void;
+  onSpawnMob: (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper' | 'chicken') => void;
   canUndo: boolean;
   onUndo: () => void;
 }
@@ -127,10 +127,13 @@ const CREATIVE_CATEGORIES: {
   {
     name: 'Lighting & Functional',
     items: [
-      { id: 'lantern', name: 'Hanging Lantern' },
-      { id: 'glowstone', name: 'Glowstone' },
-      { id: 'sea_lantern', name: 'Sea Lantern' },
+      { id: 'lantern', name: 'Lantern' },
+      { id: 'soul_lantern', name: 'Soul Lantern' },
+      { id: 'candle', name: 'Lit Candle' },
+      { id: 'soul_candle', name: 'Soul Candle' },
       { id: 'redstone_lamp', name: 'Redstone Lamp' },
+      { id: 'sea_lantern', name: 'Sea Lantern' },
+      { id: 'glowstone', name: 'Glowstone' },
       { id: 'torch', name: 'Torch' },
       { id: 'tnt', name: 'TNT Explosive' },
       { id: 'crafting_table', name: 'Crafting Table' },
@@ -194,14 +197,15 @@ const CREATIVE_CATEGORIES: {
 ];
 
 const MOBS_DATA: {
-  type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper';
+  type: 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'creeper';
   name: string;
   desc: string;
   icon: string;
 }[] = [
-  { type: 'pig', name: 'Friendly Pig', desc: 'Pink farm animal that wanders and oinks happily.', icon: '🐷' },
-  { type: 'cow', name: 'Dairy Cow', desc: 'Classic black and white cow grazing on grass.', icon: '🐮' },
-  { type: 'sheep', name: 'Fluffy Sheep', desc: 'White wool sheep roaming the green fields.', icon: '🐑' },
+  { type: 'pig', name: 'Friendly Pig', desc: 'Pink farm animal with snout that wanders and oinks happily.', icon: '🐷' },
+  { type: 'cow', name: 'Dairy Cow', desc: 'Horns, dark-patched hide & udders, grazing peacefully.', icon: '🐮' },
+  { type: 'sheep', name: 'Fluffy Sheep', desc: 'Puffy wool fleece sheep that grazes on grass fields.', icon: '🐑' },
+  { type: 'chicken', name: 'Feathered Chicken', desc: 'White chicken with flapping wings, red comb, and yellow beak.', icon: '🐔' },
   { type: 'zombie', name: 'Night Zombie', desc: 'Undead mob roaming around. (Harmless in Creative!)', icon: '🧟' },
   { type: 'skeleton', name: 'Skeleton Archer', desc: 'Ancient bone warrior.', icon: '💀' },
   { type: 'creeper', name: 'Voxel Creeper', desc: 'Iconic green creature with ticking fuse.', icon: '💥' },
@@ -254,72 +258,72 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
         </div>
 
         {/* Top Navigation Tabs & Undo */}
-        <div className="flex justify-between items-center mb-3 gap-1 overflow-x-auto pb-1">
-          <div className="flex gap-1.5 flex-wrap">
+        <div className="flex justify-between items-center mb-2 sm:mb-3 gap-1 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex gap-1 overflow-x-auto flex-nowrap py-0.5">
             <button
               onClick={() => {
                 sounds.playPop();
                 setActiveTab('blueprints');
               }}
-              className={`px-3 py-1.5 text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap ${
+              className={`px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'blueprints'
                   ? 'bg-[#3b6ea5] text-white border-2 border-[#1c3a5e]'
                   : 'mc-btn'
               }`}
             >
-              🏛️ Blueprints ({STRUCTURES.length})
+              🏛️ Blueprints
             </button>
             <button
               onClick={() => {
                 sounds.playPop();
                 setActiveTab('vehicles');
               }}
-              className={`px-3 py-1.5 text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap ${
+              className={`px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'vehicles'
                   ? 'bg-[#eab308] text-black border-2 border-[#854d0e]'
                   : 'mc-btn'
               }`}
             >
-              🚗 Drive Vehicles
+              🚗 Vehicles
             </button>
             <button
               onClick={() => {
                 sounds.playPop();
                 setActiveTab('multitools');
               }}
-              className={`px-3 py-1.5 text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap ${
+              className={`px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'multitools'
                   ? 'bg-[#8b5cf6] text-white border-2 border-[#5b21b6]'
                   : 'mc-btn'
               }`}
             >
-              🔮 Super Tools
+              🔮 Tools
             </button>
             <button
               onClick={() => {
                 sounds.playPop();
                 setActiveTab('mobs');
               }}
-              className={`px-3 py-1.5 text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap ${
+              className={`px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'mobs'
                   ? 'bg-[#10b981] text-white border-2 border-[#047857]'
                   : 'mc-btn'
               }`}
             >
-              🐮 Spawn Mobs
+              🐮 Mobs
             </button>
             <button
               onClick={() => {
                 sounds.playPop();
                 setActiveTab('creative_palette');
               }}
-              className={`px-3 py-1.5 text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap ${
+              className={`px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold cursor-pointer rounded-xs transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'creative_palette'
                   ? 'bg-[#3b6ea5] text-white border-2 border-[#1c3a5e]'
                   : 'mc-btn'
               }`}
             >
-              📦 Infinite Blocks
+              📦 Blocks
             </button>
           </div>
 
@@ -355,7 +359,14 @@ export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
                       {struct.icon}
                     </span>
                     <div className="flex-1">
-                      <h3 className="font-bold text-sm text-[#111]">{struct.name}</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-bold text-sm text-[#111]">{struct.name}</h3>
+                        {struct.id === 'real_modern_megacity' && (
+                          <span className="px-1.5 py-0.5 text-[9px] bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black rounded-xs uppercase tracking-wider shadow-xs">
+                            ★ New Megacity
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-[#444] leading-snug mt-0.5">
                         {struct.description}
                       </p>
