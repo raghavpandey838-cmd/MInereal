@@ -10,12 +10,14 @@ export class DayNightCycle {
   public sunLight: THREE.DirectionalLight;
   public hemiLight: THREE.HemisphereLight;
   public sunMesh: THREE.Mesh;
+  public sunCoronaMesh: THREE.Mesh;
   public moonMesh: THREE.Mesh;
   public starPoints: THREE.Points;
   public cloudMesh: THREE.Mesh;
   public cloudTexture: THREE.CanvasTexture;
   public timeOfDay: number = 0.5; // Strictly DAY TIME only (0.5 = High Noon)
   public dayDurationSec: number = 240;
+  public isUnderwater: boolean = false;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -39,7 +41,7 @@ export class DayNightCycle {
     this.hemiLight = new THREE.HemisphereLight(0x8abaff, 0x567e37, 1.1);
     this.scene.add(this.hemiLight);
 
-    // 3. Iconic Square Minecraft Sun
+    // 3. Iconic Square Minecraft Sun & Celestial Corona Bloom
     const sunGeom = new THREE.PlaneGeometry(24, 24);
     const sunMat = new THREE.MeshBasicMaterial({
       color: 0xfffbe8,
@@ -48,6 +50,20 @@ export class DayNightCycle {
     });
     this.sunMesh = new THREE.Mesh(sunGeom, sunMat);
     this.scene.add(this.sunMesh);
+
+    // Atmospheric Celestial Corona Glow (BSL Shaderpack style bloom)
+    const coronaGeom = new THREE.PlaneGeometry(56, 56);
+    const coronaMat = new THREE.MeshBasicMaterial({
+      color: 0xffdf80,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+    });
+    this.sunCoronaMesh = new THREE.Mesh(coronaGeom, coronaMat);
+    this.scene.add(this.sunCoronaMesh);
 
     // 4. Moon Billboard (hidden below world because night is disabled)
     const moonGeom = new THREE.PlaneGeometry(14, 14);
@@ -97,15 +113,16 @@ export class DayNightCycle {
         const v3 = Math.cos((nx + ny) * Math.PI * 6) * 0.35;
         const density = v1 + v2 + v3;
 
-        if (density > 0.08) {
+        // Sparser, realistic Minecraft voxel cloud clusters (fewer clouds, plenty of open sky)
+        if (density > 0.42) {
           const px = bx * blockSize;
           const py = by * blockSize;
-          // Bright white main cloud body
-          cctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+          // Crisp bright white main cloud body
+          cctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
           cctx.fillRect(px, py, blockSize, blockSize);
 
           // Authentic Minecraft bottom shadow underbelly for 3D voxel effect
-          cctx.fillStyle = 'rgba(216, 228, 248, 0.90)';
+          cctx.fillStyle = 'rgba(210, 224, 246, 0.85)';
           cctx.fillRect(px, py + blockSize - 1, blockSize, 1);
         }
       }
@@ -116,20 +133,20 @@ export class DayNightCycle {
     this.cloudTexture.minFilter = THREE.NearestFilter;
     this.cloudTexture.wrapS = THREE.RepeatWrapping;
     this.cloudTexture.wrapT = THREE.RepeatWrapping;
-    this.cloudTexture.repeat.set(12, 12);
+    this.cloudTexture.repeat.set(5, 5); // Relaxed repetition for calm, sparse Minecraft clouds
 
-    const cloudGeom = new THREE.PlaneGeometry(1400, 1400);
+    const cloudGeom = new THREE.PlaneGeometry(1600, 1600);
     const cloudMat = new THREE.MeshBasicMaterial({
       map: this.cloudTexture,
       transparent: true,
-      opacity: 0.94,
+      opacity: 0.92,
       side: THREE.DoubleSide,
       fog: false,
       depthWrite: false,
     });
     this.cloudMesh = new THREE.Mesh(cloudGeom, cloudMat);
     this.cloudMesh.rotation.x = Math.PI / 2;
-    this.cloudMesh.position.set(0, 126, 0);
+    this.cloudMesh.position.set(0, 138, 0);
     this.scene.add(this.cloudMesh);
 
     // 7. Horizon Fog (Crisp Minecraft daytime blue with clear view distance)
@@ -139,6 +156,10 @@ export class DayNightCycle {
   public setTimeOfDay(_time: number) {
     // Perpetual sunny day: user requested strictly DAY TIME only (no night time)
     this.timeOfDay = 0.5;
+  }
+
+  public setUnderwater(underwater: boolean) {
+    this.isUnderwater = underwater;
   }
 
   public update(dt: number, playerPos: THREE.Vector3) {
@@ -155,6 +176,9 @@ export class DayNightCycle {
 
     this.sunMesh.position.set(sunX, sunY, sunZ);
     this.sunMesh.lookAt(playerPos);
+
+    this.sunCoronaMesh.position.set(sunX, sunY, sunZ);
+    this.sunCoronaMesh.lookAt(playerPos);
 
     // Hide moon below world
     this.moonMesh.position.set(playerPos.x, playerPos.y - 150, playerPos.z);
@@ -175,15 +199,27 @@ export class DayNightCycle {
       this.cloudTexture.offset.y += dt * 0.0008;
     }
 
-    // Authentic vibrant bright Minecraft Sky & Fog
-    const daySkyColor = new THREE.Color(0x7cb2ff);
-    this.scene.background = daySkyColor;
-    if (this.scene.fog) {
-      this.scene.fog.color.copy(daySkyColor);
+    if (this.isUnderwater) {
+      // Murky deep-blue authentic Minecraft underwater immersion
+      const waterSkyColor = new THREE.Color(0x0a284e);
+      this.scene.background = waterSkyColor;
+      if (this.scene.fog && this.scene.fog instanceof THREE.FogExp2) {
+        this.scene.fog.color.setHex(0x0c305c);
+        this.scene.fog.density = 0.038;
+      }
+      this.sunLight.intensity = 0.75;
+      this.hemiLight.intensity = 0.45;
+    } else {
+      // Authentic vibrant bright Minecraft Sky & Horizon Fog
+      const daySkyColor = new THREE.Color(0x7cb2ff);
+      this.scene.background = daySkyColor;
+      if (this.scene.fog && this.scene.fog instanceof THREE.FogExp2) {
+        this.scene.fog.color.copy(daySkyColor);
+        this.scene.fog.density = 0.0085;
+      }
+      this.sunLight.intensity = 2.15;
+      this.hemiLight.intensity = 1.1;
     }
-
-    this.sunLight.intensity = 2.15;
-    this.hemiLight.intensity = 1.1;
   }
 
   public dispose() {
@@ -191,6 +227,8 @@ export class DayNightCycle {
     this.scene.remove(this.hemiLight);
     this.scene.remove(this.sunMesh);
     this.sunMesh.geometry.dispose();
+    this.scene.remove(this.sunCoronaMesh);
+    this.sunCoronaMesh.geometry.dispose();
     this.scene.remove(this.moonMesh);
     this.moonMesh.geometry.dispose();
     this.scene.remove(this.starPoints);
@@ -200,3 +238,4 @@ export class DayNightCycle {
     this.cloudTexture.dispose();
   }
 }
+

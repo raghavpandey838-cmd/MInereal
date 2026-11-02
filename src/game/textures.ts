@@ -1906,6 +1906,47 @@ export function getItemIcon(itemId: ItemId): string {
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.fillRect(4, 11, 24, 2);
     ctx.fillRect(4, 19, 24, 2);
+  } else if (itemId.includes('chestplate')) {
+    const isDia = itemId.includes('diamond');
+    const baseCol = isDia ? '#06b6d4' : '#e2e8f0';
+    const darkCol = isDia ? '#0891b2' : '#94a3b8';
+    // Chestplate torso
+    ctx.fillStyle = baseCol;
+    ctx.fillRect(8, 8, 16, 18);
+    // Shoulder pads
+    ctx.fillRect(4, 8, 6, 10);
+    ctx.fillRect(22, 8, 6, 10);
+    // Neck cut
+    ctx.clearRect(12, 8, 8, 6);
+    // Shading
+    ctx.fillStyle = darkCol;
+    ctx.fillRect(8, 22, 16, 4);
+    ctx.fillRect(4, 14, 4, 4);
+    ctx.fillRect(24, 14, 4, 4);
+  } else if (itemId.includes('helmet')) {
+    const isDia = itemId.includes('diamond');
+    const baseCol = isDia ? '#06b6d4' : '#e2e8f0';
+    const darkCol = isDia ? '#0891b2' : '#94a3b8';
+    // Helmet dome
+    ctx.fillStyle = baseCol;
+    ctx.fillRect(6, 6, 20, 16);
+    // Face slit
+    ctx.clearRect(10, 16, 12, 6);
+    // Nose bridge
+    ctx.fillRect(15, 14, 2, 8);
+    ctx.fillStyle = darkCol;
+    ctx.fillRect(6, 6, 20, 3);
+  } else if (itemId === 'shield') {
+    // Wooden shield with iron rim
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(6, 4, 20, 24);
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(8, 6, 16, 20);
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(14, 4, 4, 24);
+    ctx.fillRect(6, 14, 20, 4);
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillRect(15, 15, 2, 2);
   } else {
     // Default block thumbnail representation
     ctx.fillStyle = '#7a7a7a';

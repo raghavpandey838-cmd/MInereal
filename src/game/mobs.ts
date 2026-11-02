@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { MobEntity, DroppedItemEntity, ParticleEffect, ItemId, BlockType } from './types';
+import { MobEntity, DroppedItemEntity, ParticleEffect, ItemId, BlockType, GameMode } from './types';
 import { VoxelWorld } from './world';
 import { PhysicsEngine } from './physics';
 import { sounds } from './audio';
@@ -424,10 +424,13 @@ export class EntityManager {
     playerPos: THREE.Vector3,
     dt: number,
     onPlayerDamage: (amount: number) => void,
-    heldItemId?: ItemId | null
+    heldItemId?: ItemId | null,
+    gameMode: GameMode = 'survival'
   ) {
     const mobPos = new THREE.Vector3();
     const mobVel = new THREE.Vector3();
+    const isTargetable = gameMode !== 'creative' && gameMode !== 'spectator';
+    const isHardcore = gameMode === 'hardcore';
 
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const mob = this.mobs[i];
@@ -460,19 +463,21 @@ export class EntityManager {
       const dyToPlayer = playerPos.y - ent.y;
 
       if (ent.type === 'zombie') {
-        if (distToPlayer < 16) {
+        if (isTargetable && distToPlayer < (isHardcore ? 20 : 16)) {
           // Chase player
           const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
           ent.yaw = angle;
-          ent.vx = Math.sin(angle) * 2.2;
-          ent.vz = Math.cos(angle) * 2.2;
+          const chaseSpeed = isHardcore ? 2.5 : 2.2;
+          ent.vx = Math.sin(angle) * chaseSpeed;
+          ent.vz = Math.cos(angle) * chaseSpeed;
 
           // Attack player if close
           if (distToPlayer < 1.3 && Math.abs(dyToPlayer) < 1.5) {
             if (ent.attackCooldown <= 0) {
-              onPlayerDamage(3);
+              const dmg = isHardcore ? 5 : 3;
+              onPlayerDamage(dmg);
               sounds.playPlayerHurt();
-              ent.attackCooldown = 1.0;
+              ent.attackCooldown = isHardcore ? 0.8 : 1.0;
             }
           }
         } else {
@@ -484,7 +489,7 @@ export class EntityManager {
           }
         }
       } else if (ent.type === 'skeleton') {
-        if (distToPlayer < 18) {
+        if (isTargetable && distToPlayer < (isHardcore ? 22 : 18)) {
           const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
           ent.yaw = angle;
           // Keep distance (around 8-12 blocks) and strafe
@@ -501,39 +506,59 @@ export class EntityManager {
 
           if (distToPlayer < 14 && Math.abs(dyToPlayer) < 3.0) {
             if (ent.attackCooldown <= 0) {
-              onPlayerDamage(2);
+              const dmg = isHardcore ? 4 : 2;
+              onPlayerDamage(dmg);
               sounds.playPlayerHurt();
-              ent.attackCooldown = 2.0;
+              ent.attackCooldown = isHardcore ? 1.4 : 2.0;
             }
+          }
+        } else {
+          // Slow wander
+          if (Math.random() < 0.02) {
+            ent.yaw += (Math.random() - 0.5) * 2;
+            ent.vx = Math.sin(ent.yaw) * 0.7;
+            ent.vz = Math.cos(ent.yaw) * 0.7;
           }
         }
       } else if (ent.type === 'creeper') {
-        if (distToPlayer < 14) {
+        if (isTargetable && distToPlayer < (isHardcore ? 16 : 14)) {
           const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
           ent.yaw = angle;
-          ent.vx = Math.sin(angle) * 2.4;
-          ent.vz = Math.cos(angle) * 2.4;
+          const chaseSpeed = isHardcore ? 2.7 : 2.4;
+          ent.vx = Math.sin(angle) * chaseSpeed;
+          ent.vz = Math.cos(angle) * chaseSpeed;
 
           // Fuse ticking if very close!
-          if (distToPlayer < 3.0) {
+          const fuseTriggerDist = isHardcore ? 3.5 : 3.0;
+          const maxFuseTime = isHardcore ? 1.0 : 1.5;
+
+          if (distToPlayer < fuseTriggerDist) {
             ent.fuse = (ent.fuse || 0) + dt;
-            if (ent.fuse > 0.1 && ent.fuse < 0.25) {
+            if (ent.fuse > 0.08 && ent.fuse < 0.22) {
               sounds.playCreeperHiss();
             }
 
             // Swell / pulse white
-            const scale = 1.0 + (ent.fuse / 1.5) * 0.35;
+            const scale = 1.0 + (ent.fuse / maxFuseTime) * 0.4;
             mob.group.scale.set(scale, scale, scale);
 
-            if (ent.fuse >= 1.5) {
+            if (ent.fuse >= maxFuseTime) {
               // EXPLODE!
-              this.explodeAt(world, ent.x, ent.y + 0.5, ent.z, 3.5);
+              this.explodeAt(world, ent.x, ent.y + 0.5, ent.z, isHardcore ? 4.5 : 3.5);
               this.killMob(i, world, false);
               continue;
             }
           } else {
             ent.fuse = Math.max(0, (ent.fuse || 0) - dt * 2);
             mob.group.scale.set(1, 1, 1);
+          }
+        } else {
+          ent.fuse = 0;
+          mob.group.scale.set(1, 1, 1);
+          if (Math.random() < 0.02) {
+            ent.yaw += (Math.random() - 0.5) * 2;
+            ent.vx = Math.sin(ent.yaw) * 0.7;
+            ent.vz = Math.cos(ent.yaw) * 0.7;
           }
         }
       } else {

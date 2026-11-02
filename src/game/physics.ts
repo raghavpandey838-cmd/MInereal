@@ -65,8 +65,16 @@ export class PhysicsEngine {
     halfWidth: number,
     height: number,
     dt: number,
-    canStep: boolean = true
+    canStep: boolean = true,
+    noclip: boolean = false
   ): { isGrounded: boolean; hitCeiling: boolean; hitWall: boolean; inWater: boolean } {
+    if (noclip) {
+      pos.x += vel.x * dt;
+      pos.y += vel.y * dt;
+      pos.z += vel.z * dt;
+      return { isGrounded: false, hitCeiling: false, hitWall: false, inWater: false };
+    }
+
     let isGrounded = false;
     let hitCeiling = false;
     let hitWall = false;

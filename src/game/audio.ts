@@ -635,6 +635,58 @@ class SoundEngine {
     osc.stop(now + 0.14);
   }
 
+  // Realistic Minecraft water splash
+  public playSplash() {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const noiseBuffer = this.createNoiseBuffer(0.25);
+    if (!noiseBuffer) return;
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(320, now);
+    filter.frequency.exponentialRampToValueAtTime(680, now + 0.15);
+    filter.Q.setValueAtTime(1.8, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain!);
+
+    noise.start(now);
+    noise.stop(now + 0.25);
+  }
+
+  // Underwater bubble pop
+  public playBubble() {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600 + Math.random() * 200, now);
+    osc.frequency.exponentialRampToValueAtTime(1200 + Math.random() * 300, now + 0.08);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain!);
+
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }
+
   // Peaceful C418-inspired generative ambient melody
   public startAmbientMusic() {
     if (this.musicInterval) return;

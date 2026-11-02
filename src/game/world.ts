@@ -217,11 +217,11 @@ export class VoxelWorld {
         const tempNoise = this.perlin.noise2D(wx * 0.007, wz * 0.007);
         const isDesert = tempNoise > 0.38;
 
-        // 4. Mountains & Hills
-        const mountainNoise = this.perlin.noise2D(wx * 0.006 + 50, wz * 0.006 + 50);
-        const isMountain = mountainNoise > 0.28 && !isDeepOcean;
+        // 4. Realistic Mountain Ridges & Alpine Peaks (Jagged Peaks & Stony Slopes)
+        const mountainNoise = this.perlin.noise2D(wx * 0.005 + 60, wz * 0.005 + 60);
+        const isMountain = mountainNoise > 0.22 && !isDeepOcean;
 
-        // 5. Calculate Terrain Height
+        // 5. Calculate Realistic Multi-Layered Terrain Height
         let height = 26; // baseline above SEA_LEVEL (24)
 
         if (isDeepOcean) {
@@ -229,21 +229,22 @@ export class VoxelWorld {
           const seaFloor = 14 + Math.floor(Math.abs(oceanNoise) * 12);
           height = Math.max(8, seaFloor);
         } else if (isRiver) {
-          // River channel bed
+          // Smooth river channel bed
           height = SEA_LEVEL - 2;
         } else if (isMountain) {
-          // Towering mountain peaks
-          const peakBonus = (mountainNoise - 0.28) * 45;
-          const rough = this.perlin.fbm2D(wx * 0.03, wz * 0.03, 3, 0.5) * 8;
-          height = Math.floor(32 + peakBonus + rough);
-          height = Math.min(CHUNK_HEIGHT - 6, height);
+          // Majestic Alpine Mountain Peaks with sweeping ridges & rocky peaks
+          const ridge = 1.0 - Math.abs(mountainNoise * 2.4 - 1.0);
+          const peakBonus = Math.max(0, mountainNoise - 0.22) * 52;
+          const rough = this.perlin.fbm2D(wx * 0.024, wz * 0.024, 3, 0.5) * 8;
+          height = Math.floor(30 + peakBonus * (1.0 + Math.max(0, ridge) * 0.45) + rough);
+          height = Math.min(CHUNK_HEIGHT - 4, height);
         } else if (isDesert) {
           // Rolling desert dunes
           const dune = this.perlin.fbm2D(wx * 0.02, wz * 0.02, 2, 0.5) * 8;
           height = Math.floor(25 + dune);
         } else {
           // Plains & Forest rolling landscape
-          const hill = this.perlin.fbm2D(wx * 0.018, wz * 0.018, 3, 0.5) * 9;
+          const hill = this.perlin.fbm2D(wx * 0.016, wz * 0.016, 3, 0.5) * 9;
           height = Math.floor(26 + hill);
         }
 
@@ -262,35 +263,38 @@ export class VoxelWorld {
             continue;
           }
 
-          // 3D Cave Noise carving
+          // 3D Organic Cave Tunnel Noise carving
           const caveNoise = this.perlin.noise3D(wx * 0.06, y * 0.08, wz * 0.06);
           if (y < height - 2 && caveNoise > 0.48 && y > 3 && !isDeepOcean) {
             chunk.setBlock(lx, y, lz, BlockType.AIR);
             continue;
           }
 
-          // Surface block layer
+          // Surface block layer (Realistic multi-layer biome transition)
           if (y === height) {
             if (height <= SEA_LEVEL + 1) {
               // Beaches & Seabed
               chunk.setBlock(lx, y, lz, BlockType.SAND);
             } else if (isDesert) {
               chunk.setBlock(lx, y, lz, BlockType.SAND);
-            } else if (height > 46) {
-              // High mountain snow
+            } else if (height > 44) {
+              // High mountain snow caps (real Minecraft snowy peaks)
               chunk.setBlock(lx, y, lz, BlockType.SNOW);
-            } else if (height > 38) {
-              // Rocky mountain cliff
-              chunk.setBlock(lx, y, lz, BlockType.STONE);
+            } else if (height > 36) {
+              // Rocky mountain cliff and stony slopes
+              const isCobble = Math.sin(wx * 0.3 + wz * 0.3) > 0.4;
+              chunk.setBlock(lx, y, lz, isCobble ? BlockType.COBBLESTONE : BlockType.STONE);
             } else {
-              // Lush green grass
+              // Lush green grass in valleys, plains, and mountain foothills
               chunk.setBlock(lx, y, lz, BlockType.GRASS);
             }
           } else if (y >= height - 3) {
             if (isDesert || height <= SEA_LEVEL + 1) {
               chunk.setBlock(lx, y, lz, BlockType.SAND);
-            } else if (height > 46) {
+            } else if (height > 44) {
               chunk.setBlock(lx, y, lz, BlockType.SNOW);
+            } else if (height > 36) {
+              chunk.setBlock(lx, y, lz, BlockType.STONE);
             } else {
               chunk.setBlock(lx, y, lz, BlockType.DIRT);
             }
@@ -354,24 +358,56 @@ export class VoxelWorld {
   }
 
   private growTree(baseX: number, baseY: number, baseZ: number) {
-    const trunkHeight = 4 + Math.floor(Math.random() * 2);
+    const isAlpine = baseY > 32;
 
-    // Trunk
-    for (let y = 0; y < trunkHeight; y++) {
-      this.setRawBlockInChunk(baseX, baseY + y, baseZ, BlockType.OAK_LOG);
-    }
+    if (isAlpine) {
+      // Authentic Alpine Spruce Tree (Cone shaped with dark wood and spruce leaves)
+      const trunkHeight = 6 + Math.floor(Math.random() * 2);
+      for (let y = 0; y < trunkHeight; y++) {
+        this.setRawBlockInChunk(baseX, baseY + y, baseZ, BlockType.SPRUCE_LOG);
+      }
+      // Layered pine canopy
+      const leafTop = baseY + trunkHeight + 1;
+      this.setRawBlockInChunk(baseX, leafTop, baseZ, BlockType.SPRUCE_LEAVES);
 
-    // Leaves canopy
-    const leafStart = baseY + trunkHeight - 2;
-    for (let ly = leafStart; ly <= baseY + trunkHeight + 1; ly++) {
-      const radius = ly >= baseY + trunkHeight ? 1 : 2;
-      for (let ox = -radius; ox <= radius; ox++) {
-        for (let oz = -radius; oz <= radius; oz++) {
-          if (ox === 0 && oz === 0 && ly < baseY + trunkHeight) continue;
-          if (Math.abs(ox) === radius && Math.abs(oz) === radius && Math.random() > 0.6) continue;
-          const curr = this.getBlock(baseX + ox, ly, baseZ + oz);
-          if (curr === BlockType.AIR) {
-            this.setRawBlockInChunk(baseX + ox, ly, baseZ + oz, BlockType.OAK_LEAVES);
+      for (let y = leafTop - 1; y >= baseY + 2; y--) {
+        const distFromTop = leafTop - y;
+        const radius = (distFromTop % 2 === 1) ? 1 : Math.min(2, Math.floor(distFromTop / 2));
+        for (let ox = -radius; ox <= radius; ox++) {
+          for (let oz = -radius; oz <= radius; oz++) {
+            if (ox === 0 && oz === 0 && y < baseY + trunkHeight) continue;
+            if (Math.abs(ox) === radius && Math.abs(oz) === radius && radius > 1) continue;
+            const curr = this.getBlock(baseX + ox, y, baseZ + oz);
+            if (curr === BlockType.AIR) {
+              this.setRawBlockInChunk(baseX + ox, y, baseZ + oz, BlockType.SPRUCE_LEAVES);
+            }
+          }
+        }
+      }
+    } else {
+      // Classic Oak or Birch Tree in Valleys & Plains
+      const isBirch = Math.random() < 0.25;
+      const logType = isBirch ? BlockType.BIRCH_LOG : BlockType.OAK_LOG;
+      const leafType = isBirch ? BlockType.BIRCH_LEAVES : BlockType.OAK_LEAVES;
+      const trunkHeight = 4 + Math.floor(Math.random() * 2);
+
+      // Trunk
+      for (let y = 0; y < trunkHeight; y++) {
+        this.setRawBlockInChunk(baseX, baseY + y, baseZ, logType);
+      }
+
+      // Leaves canopy
+      const leafStart = baseY + trunkHeight - 2;
+      for (let ly = leafStart; ly <= baseY + trunkHeight + 1; ly++) {
+        const radius = ly >= baseY + trunkHeight ? 1 : 2;
+        for (let ox = -radius; ox <= radius; ox++) {
+          for (let oz = -radius; oz <= radius; oz++) {
+            if (ox === 0 && oz === 0 && ly < baseY + trunkHeight) continue;
+            if (Math.abs(ox) === radius && Math.abs(oz) === radius && Math.random() > 0.6) continue;
+            const curr = this.getBlock(baseX + ox, ly, baseZ + oz);
+            if (curr === BlockType.AIR) {
+              this.setRawBlockInChunk(baseX + ox, ly, baseZ + oz, leafType);
+            }
           }
         }
       }

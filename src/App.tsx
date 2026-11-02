@@ -169,6 +169,8 @@ export default function App() {
     torchLights: THREE.PointLight[];
     lastUiUpdate: number;
     lastChunkCheck: number;
+    wasInWater?: boolean;
+    lastDrownTime?: number;
   } | null>(null);
 
   // Check saved game in localStorage
@@ -190,6 +192,21 @@ export default function App() {
       engineRef.current.hand.updateHeldItem(currentItem);
     }
   }, [selectedHotbarIndex, inventory]);
+
+  // Recalculate player armor defense points from worn / held gear
+  useEffect(() => {
+    let totalArmor = 0;
+    for (const slot of inventory) {
+      if (!slot) continue;
+      if (slot.id === 'diamond_chestplate') totalArmor += 8;
+      else if (slot.id === 'iron_chestplate') totalArmor += 6;
+      else if (slot.id === 'diamond_helmet') totalArmor += 3;
+      else if (slot.id === 'iron_helmet') totalArmor += 2;
+      else if (slot.id === 'shield') totalArmor += 3;
+    }
+    const finalArmor = Math.min(20, totalArmor);
+    setPlayerStats((prev) => (prev.armor === finalArmor ? prev : { ...prev, armor: finalArmor }));
+  }, [inventory]);
 
   // Main Three.js Initialization
   useEffect(() => {
@@ -317,7 +334,8 @@ export default function App() {
           setGameState((curr) => (curr === 'playing' ? 'paused' : curr));
         }
       } else {
-        setGameState('playing');
+        // ONLY switch to playing if we were explicitly paused; NEVER force start from title screen!
+        setGameState((curr) => (curr === 'paused' ? 'playing' : curr));
       }
     };
     document.addEventListener('pointerlockchange', handlePointerLockChange);
@@ -357,13 +375,16 @@ export default function App() {
   // Damage Player function
   const applyPlayerDamage = useCallback(
     (amount: number) => {
-      if (gameMode === 'creative' || isFlying) return;
+      if (gameMode === 'creative' || gameMode === 'spectator' || (isFlying && gameMode !== 'hardcore' && gameMode !== 'survival' && gameMode !== 'adventure')) return;
       sounds.playPlayerHurt();
       setHurtFlash(true);
       setTimeout(() => setHurtFlash(false), 250);
 
       setPlayerStats((prev) => {
-        const nextHealth = Math.max(0, prev.health - amount);
+        // Authentic Minecraft armor defense mitigation: each armor point mitigates 4% damage
+        const defenseFactor = Math.max(0.2, 1 - prev.armor * 0.04);
+        const actualDamage = Math.max(1, Math.round(amount * defenseFactor));
+        const nextHealth = Math.max(0, prev.health - actualDamage);
         if (nextHealth <= 0) {
           setGameState('dead');
           document.exitPointerLock?.();
@@ -883,6 +904,19 @@ export default function App() {
         const feetBlock = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y + 0.1), Math.floor(playerPos.z));
         const headBlock = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y + 1.5), Math.floor(playerPos.z));
         const inWater = feetBlock === BlockType.WATER || headBlock === BlockType.WATER;
+        const headInWater = headBlock === BlockType.WATER;
+
+        // Realistic Minecraft water entry / exit splashes
+        if (inWater && !engine.wasInWater) {
+          sounds.playSplash();
+          entities.spawnParticleBurst(playerPos.x, playerPos.y + 0.2, playerPos.z, '#60a5fa', 8);
+        } else if (!inWater && engine.wasInWater) {
+          sounds.playSplash();
+        }
+        engine.wasInWater = inWater;
+
+        // Realistic underwater atmosphere
+        sky.setUnderwater(headInWater);
 
         // Vertical Movement: Flight vs Gravity
         if (isFlying) {
@@ -921,9 +955,10 @@ export default function App() {
           unlockAdvancement('sky_high');
         }
 
-        // Move entity with physics
+        // Move entity with physics (Spectator uses noclip to pass freely through solid blocks!)
+        const isSpectator = gameMode === 'spectator';
         const preMoveY = playerPos.y;
-        const moveRes = PhysicsEngine.moveEntity(world, playerPos, playerVel, 0.3, 1.8, dt, !isFlying);
+        const moveRes = PhysicsEngine.moveEntity(world, playerPos, playerVel, 0.3, 1.8, dt, !isFlying && !isSpectator, isSpectator);
 
         // Jump
         if (!isFlying && keys['Space'] && moveRes.isGrounded && !inWater) {
@@ -933,12 +968,13 @@ export default function App() {
 
         // Fall damage
         if (!moveRes.isGrounded) {
-          if (playerVel.y < 0 && !isFlying && gameMode === 'survival') {
+          if (playerVel.y < 0 && !isFlying && (gameMode === 'survival' || gameMode === 'hardcore' || gameMode === 'adventure')) {
             engine.fallDistance += Math.abs(playerPos.y - preMoveY);
           }
         } else {
-          if (engine.fallDistance > 3.5 && gameMode === 'survival' && !isFlying) {
-            const damage = Math.floor(engine.fallDistance - 3);
+          if (engine.fallDistance > 3.5 && (gameMode === 'survival' || gameMode === 'hardcore' || gameMode === 'adventure') && !isFlying) {
+            const mult = gameMode === 'hardcore' ? 1.5 : 1.0;
+            const damage = Math.floor((engine.fallDistance - 3) * mult);
             if (damage > 0) {
               applyPlayerDamage(damage);
             }
@@ -953,6 +989,53 @@ export default function App() {
             engine.lastStepTime = time;
             const groundBlock = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 0.2), Math.floor(playerPos.z));
             sounds.playStep(groundBlock);
+          }
+        }
+
+        // Hunger & Health Mechanics (Survival, Hardcore, Adventure)
+        if (gameMode === 'survival' || gameMode === 'hardcore' || gameMode === 'adventure') {
+          if (isMovingHoriz && Math.random() < (isSprinting ? 0.006 : 0.002) * (gameMode === 'hardcore' ? 1.5 : 1.0)) {
+            setPlayerStats((prev) => ({
+              ...prev,
+              hunger: Math.max(0, +(prev.hunger - 0.2).toFixed(1)),
+            }));
+          }
+          // Health regen when hunger is full
+          if (playerStats.hunger >= 18 && playerStats.health < 20 && Math.random() < 0.008) {
+            setPlayerStats((prev) => ({
+              ...prev,
+              health: Math.min(20, prev.health + 1),
+            }));
+          }
+          // Starvation damage when hunger is 0
+          if (playerStats.hunger <= 0 && Math.random() < 0.015) {
+            applyPlayerDamage(1);
+          }
+
+          // Underwater Oxygen depletion & drowning
+          if (headInWater) {
+            setPlayerStats((prev) => ({
+              ...prev,
+              oxygen: Math.max(0, +(prev.oxygen - dt * 1.35).toFixed(2)),
+            }));
+
+            // If oxygen runs out: 2 drowning damage every 1.25s
+            if (playerStats.oxygen <= 0) {
+              if (time - (engine.lastDrownTime || 0) > 1250) {
+                engine.lastDrownTime = time;
+                sounds.playBubble();
+                applyPlayerDamage(2);
+                entities.spawnParticleBurst(playerPos.x, playerPos.y + 1.5, playerPos.z, '#93c5fd', 6);
+              }
+            }
+          } else {
+            // Emerging from water: rapidly refill oxygen
+            if (playerStats.oxygen < 20) {
+              setPlayerStats((prev) => ({
+                ...prev,
+                oxygen: Math.min(20, +(prev.oxygen + dt * 8.0).toFixed(1)),
+              }));
+            }
           }
         }
 
@@ -989,7 +1072,14 @@ export default function App() {
       const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       const hit = world.raycast(camera.position, forwardDir, 5.5);
 
-      if (hit.hit) {
+      if (gameMode === 'spectator') {
+        // Spectator mode cannot highlight or crack blocks
+        highlighter.setHighlight(0, 0, 0, false);
+        highlighter.setCrackStage(0, 0, 0, 0);
+        highlighter.setGhostPlacement(0, 0, 0, false);
+        engine.miningProgress = 0;
+        engine.isMining = false;
+      } else if (hit.hit) {
         highlighter.setHighlight(hit.x, hit.y, hit.z, true);
 
         // Ghost placement preview
@@ -998,7 +1088,7 @@ export default function App() {
           currentHeld &&
           Object.values(BLOCK_DEFS).some((d) => d.id === currentHeld.id && d.type !== BlockType.AIR);
 
-        if (isPlaceable) {
+        if (isPlaceable && gameMode !== 'adventure') {
           const placeX = hit.x + hit.normal[0];
           const placeY = hit.y + hit.normal[1];
           const placeZ = hit.z + hit.normal[2];
@@ -1019,6 +1109,19 @@ export default function App() {
         // Mining with left click
         if (engine.isMining) {
           const blockDef = BLOCK_DEFS[hit.block];
+
+          // Adventure Mode: Normal breaking of blocks is restricted!
+          // Requires specific tool matching block definition
+          if (gameMode === 'adventure') {
+            const reqTool = blockDef?.requiredToolType;
+            const hasTool = currentHeld && reqTool && currentHeld.id.includes(reqTool);
+            if (!hasTool) {
+              engine.miningProgress = 0;
+              engine.isMining = false;
+              highlighter.setCrackStage(0, 0, 0, 0);
+              return;
+            }
+          }
 
           if (
             !engine.miningBlock ||
@@ -1068,7 +1171,7 @@ export default function App() {
               [{ x: hit.x, y: hit.y, z: hit.z, oldType, newType: BlockType.AIR }],
             ]);
 
-            if (gameMode === 'survival' && blockDef && blockDef.drops.length > 0) {
+            if ((gameMode === 'survival' || gameMode === 'hardcore' || gameMode === 'adventure') && blockDef && blockDef.drops.length > 0) {
               blockDef.drops.forEach((drop) => {
                 if (!drop.chance || Math.random() <= drop.chance) {
                   entities.spawnDroppedItem(
@@ -1120,7 +1223,8 @@ export default function App() {
         (damage) => {
           applyPlayerDamage(damage);
         },
-        currentHeldId
+        currentHeldId,
+        gameMode
       );
 
       // 9. Update Dropped Items (vacuum pickup)
@@ -1164,6 +1268,7 @@ export default function App() {
   const handleMineStart = () => {
     const engine = engineRef.current;
     if (!engine || gameState !== 'playing' || activeModal !== 'none') return;
+    if (gameMode === 'spectator') return; // Spectators cannot interact or attack
 
     engine.hand.swing();
     sounds.playSwing();
@@ -1261,6 +1366,7 @@ export default function App() {
   const handleInteract = () => {
     const engine = engineRef.current;
     if (!engine || gameState !== 'playing' || activeModal !== 'none') return;
+    if (gameMode === 'spectator') return; // Spectator cannot place or interact
 
     engine.hand.swing();
     sounds.playSwing();
@@ -1408,6 +1514,11 @@ export default function App() {
       }
 
       if (placeBlockType !== null) {
+        // In Adventure Mode, normal block placing is restricted (only torches and lanterns allowed)
+        if (gameMode === 'adventure' && placeBlockType !== BlockType.TORCH && placeBlockType !== BlockType.LANTERN) {
+          return;
+        }
+
         const oldType = engine.world.getBlock(placeX, placeY, placeZ);
         engine.world.setBlock(placeX, placeY, placeZ, placeBlockType);
         engine.world.rebuildDirtyChunks();
@@ -1470,7 +1581,7 @@ export default function App() {
           engine.torchLights.push(pointLight);
         }
 
-        if (gameMode === 'survival') {
+        if (gameMode === 'survival' || gameMode === 'hardcore' || gameMode === 'adventure') {
           setInventory((prev) => {
             const newInv = [...prev];
             const slot = newInv[selectedHotbarIndex];
@@ -1488,24 +1599,42 @@ export default function App() {
     }
   };
 
-  // Mouse Down Event
+  // Mouse Down Event: Only locks pointer when clicking on the empty 3D canvas in active gameplay
   const handleMouseDown = (e: React.MouseEvent) => {
     const engine = engineRef.current;
     if (!engine) return;
 
-    // Lock pointer on first click if desktop with mouse
+    // 1. Check if clicking on ANY button or interactive UI control
+    const target = e.target as HTMLElement | null;
+    const isInteractive =
+      target &&
+      (target.closest('button, select, input, textarea, a, label, [data-interactive], .mc-btn, [role="button"]') ||
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'SELECT');
+
+    // If clicking on ANY button, dropdown, or menu element: DO NOT lock cursor or intercept!
+    if (isInteractive) {
+      return;
+    }
+
+    // 2. If on title screen, pause menu, dead screen, or open modal: NEVER lock pointer or start game from blank clicks!
+    if (gameState !== 'playing' || activeModal !== 'none') {
+      return;
+    }
+
+    // 3. User clicked on the blank 3D game canvas while actively playing:
+    // Lock cursor for first-person camera look if not locked yet
     if (!isTouchDevice && !isTouchActive.current && document.pointerLockElement !== engine.renderer.domElement) {
       try {
         engine.renderer.domElement.requestPointerLock?.();
       } catch {
         // ignore
       }
-      if (gameState === 'title') {
-        setGameState('playing');
-      }
       return;
     }
 
+    // 4. Normal in-game actions when playing with locked pointer
     if (e.button === 0) {
       handleMineStart();
     } else if (e.button === 2) {
@@ -1768,13 +1897,73 @@ export default function App() {
     }
   }, []);
 
-  // Start New World
+  // In-Game Mode Switcher
+  const handleChangeGameMode = (newMode: GameMode) => {
+    setGameMode(newMode);
+    if (newMode === 'spectator' || newMode === 'creative') {
+      setIsFlying(true);
+    } else {
+      setIsFlying(false);
+    }
+    sounds.playLevelUp();
+  };
+
+  // Start New World with selected Game Mode
   const handleStartGame = (mode: GameMode, seed: number) => {
     const engine = engineRef.current;
     if (!engine) return;
 
     setGameMode(mode);
-    setIsFlying(mode === 'creative');
+    setIsFlying(mode === 'creative' || mode === 'spectator');
+
+    // Tailor initial hotbar and inventory for the chosen authentic Minecraft mode
+    const newInv: (ItemStack | null)[] = new Array(36).fill(null);
+    if (mode === 'creative') {
+      newInv[0] = { id: 'diamond_pickaxe', count: 1 };
+      newInv[1] = { id: 'diamond_sword', count: 1 };
+      newInv[2] = { id: 'oak_planks', count: 64 };
+      newInv[3] = { id: 'bricks', count: 64 };
+      newInv[4] = { id: 'glass', count: 64 };
+      newInv[5] = { id: 'stone', count: 64 };
+      newInv[6] = { id: 'bookshelf', count: 64 };
+      newInv[7] = { id: 'tnt', count: 64 };
+      newInv[8] = { id: 'torch', count: 64 };
+    } else if (mode === 'survival') {
+      newInv[0] = { id: 'wooden_pickaxe', count: 1, durability: 60, maxDurability: 60 };
+      newInv[1] = { id: 'wooden_axe', count: 1, durability: 60, maxDurability: 60 };
+      newInv[2] = { id: 'torch', count: 12 };
+      newInv[3] = { id: 'apple', count: 6 };
+      newInv[4] = { id: 'bread', count: 4 };
+      newInv[5] = { id: 'oak_planks', count: 16 };
+    } else if (mode === 'hardcore') {
+      newInv[0] = { id: 'wooden_sword', count: 1, durability: 60, maxDurability: 60 };
+      newInv[1] = { id: 'wooden_pickaxe', count: 1, durability: 60, maxDurability: 60 };
+      newInv[2] = { id: 'torch', count: 6 };
+      newInv[3] = { id: 'apple', count: 4 };
+    } else if (mode === 'adventure') {
+      newInv[0] = { id: 'iron_sword', count: 1, durability: 250, maxDurability: 250 };
+      newInv[1] = { id: 'iron_pickaxe', count: 1, durability: 250, maxDurability: 250 };
+      newInv[2] = { id: 'iron_axe', count: 1, durability: 250, maxDurability: 250 };
+      newInv[3] = { id: 'iron_shovel', count: 1, durability: 250, maxDurability: 250 };
+      newInv[4] = { id: 'torch', count: 16 };
+      newInv[5] = { id: 'cooked_beef', count: 8 };
+    }
+    setInventory(newInv);
+
+    // Reset health & hunger stats
+    setPlayerStats({
+      health: 20,
+      maxHealth: 20,
+      hunger: 20,
+      maxHunger: 20,
+      saturation: 20,
+      oxygen: 20,
+      maxOxygen: 20,
+      experience: 0,
+      level: 1,
+      armor: 0,
+    });
+
     engine.world.seed = seed;
     engine.world.modifiedBlocks.clear();
     engine.world.generateInitialWorld(0, 0);
@@ -1821,6 +2010,7 @@ export default function App() {
           hotbar={inventory.slice(0, 9)}
           selectedIndex={selectedHotbarIndex}
           onSelectSlot={(idx) => setSelectedHotbarIndex(idx)}
+          gameMode={gameMode}
           isFlying={isFlying}
           onToggleFly={() => setIsFlying((f) => !f)}
           flySpeedMultiplier={flySpeedMultiplier}
@@ -2012,12 +2202,15 @@ export default function App() {
           handleSaveWorld();
           setGameState('title');
         }}
+        gameMode={gameMode}
+        onChangeGameMode={handleChangeGameMode}
       />
 
       {/* Death Screen */}
       <DeathScreen
         isOpen={gameState === 'dead'}
         score={playerStats.level * 100}
+        gameMode={gameMode}
         onRespawn={() => {
           if (engineRef.current) {
             const spawnY = engineRef.current.world.findHighestSolidY(0, 0) + 2;
@@ -2030,6 +2223,13 @@ export default function App() {
             hunger: prev.maxHunger,
             oxygen: prev.maxOxygen,
           }));
+          setGameState('playing');
+          engineRef.current?.renderer.domElement.requestPointerLock();
+        }}
+        onSpectate={() => {
+          // Switch to Spectator mode in Hardcore upon death
+          setGameMode('spectator');
+          setIsFlying(true);
           setGameState('playing');
           engineRef.current?.renderer.domElement.requestPointerLock();
         }}

@@ -243,6 +243,61 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     ],
     result: { id: 'bread', count: 1 },
   },
+  // Iron Chestplate
+  {
+    name: 'Iron Chestplate',
+    gridSize: 3,
+    pattern: [
+      'iron_ingot', null, 'iron_ingot',
+      'iron_ingot', 'iron_ingot', 'iron_ingot',
+      'iron_ingot', 'iron_ingot', 'iron_ingot',
+    ],
+    result: { id: 'iron_chestplate', count: 1, durability: 240, maxDurability: 240 },
+  },
+  // Diamond Chestplate
+  {
+    name: 'Diamond Chestplate',
+    gridSize: 3,
+    pattern: [
+      'diamond', null, 'diamond',
+      'diamond', 'diamond', 'diamond',
+      'diamond', 'diamond', 'diamond',
+    ],
+    result: { id: 'diamond_chestplate', count: 1, durability: 528, maxDurability: 528 },
+  },
+  // Iron Helmet
+  {
+    name: 'Iron Helmet',
+    gridSize: 3,
+    pattern: [
+      'iron_ingot', 'iron_ingot', 'iron_ingot',
+      'iron_ingot', null, 'iron_ingot',
+      null, null, null,
+    ],
+    result: { id: 'iron_helmet', count: 1, durability: 165, maxDurability: 165 },
+  },
+  // Diamond Helmet
+  {
+    name: 'Diamond Helmet',
+    gridSize: 3,
+    pattern: [
+      'diamond', 'diamond', 'diamond',
+      'diamond', null, 'diamond',
+      null, null, null,
+    ],
+    result: { id: 'diamond_helmet', count: 1, durability: 363, maxDurability: 363 },
+  },
+  // Shield
+  {
+    name: 'Shield',
+    gridSize: 3,
+    pattern: [
+      'oak_planks', 'iron_ingot', 'oak_planks',
+      'oak_planks', 'oak_planks', 'oak_planks',
+      null, 'oak_planks', null,
+    ],
+    result: { id: 'shield', count: 1, durability: 336, maxDurability: 336 },
+  },
 ];
 
 export function findMatchingRecipe(grid: (ItemStack | null)[], size: 2 | 3): ItemStack | null {

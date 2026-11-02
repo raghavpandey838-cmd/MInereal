@@ -214,15 +214,15 @@ export class Chunk {
 
             // Shading multiplier based on authentic Minecraft Java directional face lighting
             let shade = 1.0;
-            if (dy > 0) shade = 1.0; // Top Face (Sunlight)
-            else if (dy < 0) shade = 0.5; // Bottom Face (Under shadow)
-            else if (dz !== 0) shade = 0.8; // North/South Face
-            else shade = 0.6; // East/West Face
+            if (dy > 0) shade = 1.0; // Top Face (Direct Sunlight)
+            else if (dy < 0) shade = 0.52; // Bottom Face (Under shadow)
+            else if (dz !== 0) shade = 0.82; // North/South Face
+            else shade = 0.66; // East/West Face
 
             if (isWater) {
               for (const [cx, cy, cz] of face.corners) {
                 // Slightly lower water surface
-                const actualY = face.dir[1] > 0 ? y + 0.9 : y + cy;
+                const actualY = face.dir[1] > 0 ? y + 0.88 : y + cy;
                 waterPositions.push(x + cx, actualY, z + cz);
                 waterNormals.push(...face.dir);
               }
@@ -237,20 +237,83 @@ export class Chunk {
               );
               waterIndexOffset += 4;
             } else {
+              // Authentic Minecraft Smooth Ambient Occlusion (AO)
+              const aoCurve = [0.55, 0.70, 0.85, 1.0];
+              const aoScores: number[] = [];
+              const vertexShades: number[] = [];
+
+              const tx = startWX + x + dx;
+              const ty = y + dy;
+              const tz = startWZ + z + dz;
+
+              for (const [cx, cy, cz] of face.corners) {
+                let s1 = false;
+                let s2 = false;
+                let corner = false;
+
+                if (dy !== 0) {
+                  const sx = cx === 1 ? 1 : -1;
+                  const sz = cz === 1 ? 1 : -1;
+                  const b1 = getBlockAtWorldPos(tx + sx, ty, tz);
+                  const b2 = getBlockAtWorldPos(tx, ty, tz + sz);
+                  const bc = getBlockAtWorldPos(tx + sx, ty, tz + sz);
+                  s1 = b1 !== BlockType.AIR && !BLOCK_DEFS[b1]?.isTransparent;
+                  s2 = b2 !== BlockType.AIR && !BLOCK_DEFS[b2]?.isTransparent;
+                  corner = bc !== BlockType.AIR && !BLOCK_DEFS[bc]?.isTransparent;
+                } else if (dx !== 0) {
+                  const sy = cy === 1 ? 1 : -1;
+                  const sz = cz === 1 ? 1 : -1;
+                  const b1 = getBlockAtWorldPos(tx, ty + sy, tz);
+                  const b2 = getBlockAtWorldPos(tx, ty, tz + sz);
+                  const bc = getBlockAtWorldPos(tx, ty + sy, tz + sz);
+                  s1 = b1 !== BlockType.AIR && !BLOCK_DEFS[b1]?.isTransparent;
+                  s2 = b2 !== BlockType.AIR && !BLOCK_DEFS[b2]?.isTransparent;
+                  corner = bc !== BlockType.AIR && !BLOCK_DEFS[bc]?.isTransparent;
+                } else {
+                  const sx = cx === 1 ? 1 : -1;
+                  const sy = cy === 1 ? 1 : -1;
+                  const b1 = getBlockAtWorldPos(tx + sx, ty, tz);
+                  const b2 = getBlockAtWorldPos(tx, ty + sy, tz);
+                  const bc = getBlockAtWorldPos(tx + sx, ty + sy, tz);
+                  s1 = b1 !== BlockType.AIR && !BLOCK_DEFS[b1]?.isTransparent;
+                  s2 = b2 !== BlockType.AIR && !BLOCK_DEFS[b2]?.isTransparent;
+                  corner = bc !== BlockType.AIR && !BLOCK_DEFS[bc]?.isTransparent;
+                }
+
+                const aoLevel = (s1 && s2) ? 0 : 3 - (Number(s1) + Number(s2) + Number(corner));
+                aoScores.push(aoLevel);
+                vertexShades.push(shade * aoCurve[aoLevel]);
+              }
+
+              let cIdx = 0;
               for (const [cx, cy, cz] of face.corners) {
                 opaquePositions.push(x + cx, y + cy, z + cz);
                 opaqueNormals.push(...face.dir);
-                opaqueColors.push(shade, shade, shade);
+                const vs = vertexShades[cIdx++];
+                opaqueColors.push(vs, vs, vs);
               }
               opaqueUvs.push(u0, v0, u1, v0, u1, v1, u0, v1);
-              opaqueIndices.push(
-                opaqueIndexOffset,
-                opaqueIndexOffset + 1,
-                opaqueIndexOffset + 2,
-                opaqueIndexOffset,
-                opaqueIndexOffset + 2,
-                opaqueIndexOffset + 3
-              );
+
+              // Smooth AO diagonal quad triangulation flip
+              if (aoScores[0] + aoScores[2] > aoScores[1] + aoScores[3]) {
+                opaqueIndices.push(
+                  opaqueIndexOffset,
+                  opaqueIndexOffset + 1,
+                  opaqueIndexOffset + 2,
+                  opaqueIndexOffset,
+                  opaqueIndexOffset + 2,
+                  opaqueIndexOffset + 3
+                );
+              } else {
+                opaqueIndices.push(
+                  opaqueIndexOffset + 1,
+                  opaqueIndexOffset + 2,
+                  opaqueIndexOffset + 3,
+                  opaqueIndexOffset,
+                  opaqueIndexOffset + 1,
+                  opaqueIndexOffset + 3
+                );
+              }
               opaqueIndexOffset += 4;
             }
           }

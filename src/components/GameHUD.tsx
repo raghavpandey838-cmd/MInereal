@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { ItemStack, PlayerStats } from '../game/types';
+import { ItemStack, PlayerStats, GameMode } from '../game/types';
 import { getItemIcon } from '../game/textures';
 import { sounds } from '../game/audio';
 
@@ -12,6 +12,7 @@ interface GameHUDProps {
   hotbar: (ItemStack | null)[];
   selectedIndex: number;
   onSelectSlot: (index: number) => void;
+  gameMode?: GameMode;
   isFlying: boolean;
   onToggleFly: () => void;
   flySpeedMultiplier: number;
@@ -49,6 +50,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   hotbar,
   selectedIndex,
   onSelectSlot,
+  gameMode = 'creative',
   isFlying,
   onToggleFly,
   flySpeedMultiplier,
@@ -91,15 +93,40 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       .join(' ');
   };
 
+  const showVitals = gameMode === 'survival' || gameMode === 'hardcore' || gameMode === 'adventure';
+  const isHardcore = gameMode === 'hardcore';
+
   return (
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden flex flex-col justify-between">
-      {/* Screen Center Crosshair */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="drop-shadow-sm">
-          <line x1="10" y1="2" x2="10" y2="18" stroke="rgba(255,255,255,0.85)" strokeWidth="2" />
-          <line x1="2" y1="10" x2="18" y2="10" stroke="rgba(255,255,255,0.85)" strokeWidth="2" />
-        </svg>
-      </div>
+      {/* Screen Center Crosshair (hidden in Spectator mode) */}
+      {gameMode !== 'spectator' && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="drop-shadow-sm">
+            <line x1="10" y1="2" x2="10" y2="18" stroke="rgba(255,255,255,0.85)" strokeWidth="2" />
+            <line x1="2" y1="10" x2="18" y2="10" stroke="rgba(255,255,255,0.85)" strokeWidth="2" />
+          </svg>
+        </div>
+      )}
+
+      {/* Spectator Mode Banner */}
+      {gameMode === 'spectator' && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+          <div className="bg-purple-950/90 border border-purple-400 text-purple-200 px-3.5 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-xl backdrop-blur-xs flex items-center gap-1.5 animate-pulse">
+            <span>👁️</span>
+            <span>Spectator Mode · Noclip Flight Active</span>
+          </div>
+        </div>
+      )}
+
+      {/* Adventure Mode Banner */}
+      {gameMode === 'adventure' && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+          <div className="bg-amber-950/90 border border-amber-400 text-amber-200 px-3 py-0.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wider uppercase shadow-xl backdrop-blur-xs flex items-center gap-1.5">
+            <span>🗺️</span>
+            <span>Adventure Mode · Tool-Restricted Mining</span>
+          </div>
+        </div>
+      )}
 
       {/* Advancement Toast Notification (Top-Right Pop-In) */}
       {recentAdvancement && (
@@ -120,7 +147,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       )}
 
       {/* Top Bar: Ultra-slim responsive header that never covers screen on mobile */}
-      <div className="p-1 sm:p-2 text-[10px] sm:text-xs text-white/90 drop-shadow flex items-center justify-between gap-1 z-20 w-full">
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        className="p-1 sm:p-2 text-[10px] sm:text-xs text-white/90 drop-shadow flex items-center justify-between gap-1 z-20 w-full"
+      >
         {/* Left: Pause Button & Coordinates */}
         <div className="flex items-center gap-1 pointer-events-auto shrink-0">
           {/* Pause Button */}
@@ -377,6 +407,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       {/* Bottom HUD: Authentic Minecraft Bottom Interface with Hearts, Hunger, XP Bar & Blocks Hotbar Only */}
       <div
+        onMouseDown={(e) => e.stopPropagation()}
         className={`fixed bottom-1 md:bottom-2 left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center z-20 max-w-[98vw] transition-transform ${
           guiScale === 'compact' ? 'scale-85 sm:scale-95 md:scale-100 origin-bottom' : 'scale-100 origin-bottom'
         }`}
@@ -388,7 +419,110 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </div>
         )}
 
+        {/* Health, Hunger, Armor, Oxygen and Experience Bar (Active for Survival, Hardcore, and Adventure) */}
+        {showVitals && playerStats && (
+          <div className="w-full flex flex-col items-center mb-1 drop-shadow">
+            {/* Upper Stat Row: Armor (Left) and Oxygen Bubbles (Right) */}
+            {(playerStats.armor > 0 || playerStats.oxygen < 20) && (
+              <div className="flex justify-between items-center w-full px-1 mb-0.5 text-[10px] sm:text-xs">
+                {/* 10 Armor Icons (Defense) */}
+                <div className="flex items-center gap-0.5 min-w-[70px]">
+                  {playerStats.armor > 0 &&
+                    Array.from({ length: 10 }).map((_, i) => {
+                      const armor = playerStats.armor;
+                      const isFull = armor >= (i + 1) * 2;
+                      const isHalf = !isFull && armor >= i * 2 + 1;
+                      return (
+                        <span
+                          key={`armor-${i}`}
+                          className={`text-[10px] sm:text-xs select-none ${
+                            isFull || isHalf ? 'text-slate-300 drop-shadow' : 'text-gray-600 opacity-20'
+                          }`}
+                          title={`Armor: ${playerStats.armor}/20`}
+                        >
+                          🛡️
+                        </span>
+                      );
+                    })}
+                </div>
 
+                {/* 10 Oxygen Bubbles (Air supply when underwater) */}
+                <div className="flex items-center gap-0.5 justify-end min-w-[70px]">
+                  {playerStats.oxygen < 20 &&
+                    Array.from({ length: 10 }).map((_, i) => {
+                      const ox = playerStats.oxygen;
+                      const hasBubble = ox >= (i + 1) * 2;
+                      return (
+                        <span
+                          key={`oxygen-${i}`}
+                          className={`text-[10px] sm:text-xs select-none transition-all ${
+                            hasBubble ? 'opacity-100 scale-100 animate-pulse' : 'opacity-20 scale-75'
+                          }`}
+                          title={`Oxygen: ${Math.round(playerStats.oxygen)}/20`}
+                        >
+                          🫧
+                        </span>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Hearts & Drumsticks Row */}
+            <div className="flex justify-between items-center w-full px-1 mb-0.5 text-xs">
+              {/* 10 Hearts (Health) */}
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 10 }).map((_, i) => {
+                  const hp = playerStats.health;
+                  const isFull = hp >= (i + 1) * 2;
+                  const isHalf = !isFull && hp >= i * 2 + 1;
+                  return (
+                    <span
+                      key={`heart-${i}`}
+                      className={`text-xs select-none transition-transform ${
+                        isFull || isHalf ? (isHardcore ? 'text-rose-500 scale-105' : 'text-red-500') : 'text-gray-600 opacity-40'
+                      }`}
+                      title={`Health: ${playerStats.health}/20`}
+                    >
+                      {isHardcore ? (isFull ? '🖤' : isHalf ? '💔' : '🖤') : (isFull ? '❤️' : isHalf ? '💔' : '🖤')}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {/* 10 Drumsticks (Hunger) */}
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 10 }).map((_, i) => {
+                  const hunger = playerStats.hunger;
+                  const isFull = hunger >= (i + 1) * 2;
+                  const isHalf = !isFull && hunger >= i * 2 + 1;
+                  return (
+                    <span
+                      key={`hunger-${i}`}
+                      className={`text-xs select-none ${
+                        isFull || isHalf ? 'text-amber-500' : 'text-gray-600 opacity-40'
+                      }`}
+                      title={`Hunger: ${playerStats.hunger}/20`}
+                    >
+                      🍗
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* XP Bar */}
+            <div className="w-full bg-black/80 h-1.5 rounded-full overflow-hidden border border-[#2b2b2b] relative flex items-center justify-center">
+              <div
+                className="bg-gradient-to-r from-lime-500 to-green-400 h-full transition-all duration-300 rounded-full"
+                style={{ width: `${Math.min(100, Math.max(0, playerStats.experience * 100))}%` }}
+              />
+              <span className="absolute text-[8px] font-bold text-lime-400 leading-none drop-shadow-[1px_1px_0px_#000]">
+                {playerStats.level}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* 9-Slot Authentic Blocks Hotbar (Clean - No clutter below) */}
         <div className="flex bg-[#8f8f8f] p-0.5 border-t-2 border-l-2 border-[#dbdbdb] border-r-2 border-b-2 border-[#2b2b2b] shadow-2xl rounded-xs max-w-full overflow-x-auto">
@@ -422,10 +556,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   />
                 )}
 
-                {/* Count Badge (∞ in Creative Mode!) */}
+                {/* Count Badge (∞ in Creative Mode, count in Survival/Hardcore/Adventure, none in Spectator) */}
                 {slot && (
                   <span className="absolute bottom-0.5 right-0.5 text-[8px] sm:text-[9px] font-bold text-yellow-300 drop-shadow-[1px_1px_0px_#222]">
-                    ∞
+                    {gameMode === 'creative' ? '∞' : gameMode === 'spectator' ? '' : slot.count > 1 ? slot.count : ''}
                   </span>
                 )}
               </button>

@@ -236,6 +236,12 @@ export type ItemId =
   | 'stone_shovel'
   | 'iron_shovel'
   | 'diamond_shovel'
+  // Armor & Defense
+  | 'iron_chestplate'
+  | 'diamond_chestplate'
+  | 'iron_helmet'
+  | 'diamond_helmet'
+  | 'shield'
   // Materials & Food
   | 'stick'
   | 'coal'
@@ -281,7 +287,7 @@ export interface BlockDefinition {
   lightEmission?: number;
 }
 
-export type GameMode = 'survival' | 'creative';
+export type GameMode = 'survival' | 'creative' | 'adventure' | 'spectator' | 'hardcore';
 
 export interface PlayerStats {
   health: number;
