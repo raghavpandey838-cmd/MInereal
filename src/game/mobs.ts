@@ -33,6 +33,7 @@ export class EntityManager {
   public particles: ParticleEffect[] = [];
   public particlePoints: THREE.Points | null = null;
   public primedTntList: { x: number; y: number; z: number; mesh: THREE.Mesh; fuse: number }[] = [];
+  public arrows: { pos: THREE.Vector3; vel: THREE.Vector3; mesh: THREE.Mesh; life: number }[] = [];
   public scene: THREE.Scene;
 
   constructor(scene: THREE.Scene) {
@@ -418,6 +419,73 @@ export class EntityManager {
     return mobVisual;
   }
 
+  // Spawn an arrow projectile
+  public spawnArrow(fromX: number, fromY: number, fromZ: number, targetPos: THREE.Vector3) {
+    const arrowGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.65, 5);
+    arrowGeom.rotateX(Math.PI / 2);
+    const arrowMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5 });
+    const arrowMesh = new THREE.Mesh(arrowGeom, arrowMat);
+    arrowMesh.position.set(fromX, fromY, fromZ);
+
+    const dir = new THREE.Vector3().subVectors(targetPos, new THREE.Vector3(fromX, fromY, fromZ)).normalize();
+    dir.y += 0.12; // arc compensation
+    dir.normalize();
+
+    const speed = 19.0;
+    const vel = dir.multiplyScalar(speed);
+    arrowMesh.lookAt(targetPos);
+
+    this.scene.add(arrowMesh);
+    this.arrows.push({
+      pos: new THREE.Vector3(fromX, fromY, fromZ),
+      vel,
+      mesh: arrowMesh,
+      life: 0,
+    });
+  }
+
+  // Update flying arrows
+  public updateArrows(dt: number, world: VoxelWorld, playerPos: THREE.Vector3, onPlayerDamage: (amt: number) => void) {
+    for (let i = this.arrows.length - 1; i >= 0; i--) {
+      const arr = this.arrows[i];
+      arr.life += dt;
+      if (arr.life > 4.5) {
+        this.scene.remove(arr.mesh);
+        arr.mesh.geometry.dispose();
+        this.arrows.splice(i, 1);
+        continue;
+      }
+
+      arr.vel.y -= 9.8 * dt; // gravity arc
+      arr.pos.addScaledVector(arr.vel, dt);
+      arr.mesh.position.copy(arr.pos);
+      arr.mesh.lookAt(arr.pos.clone().add(arr.vel));
+
+      // Hit player check
+      const dist = arr.pos.distanceTo(new THREE.Vector3(playerPos.x, playerPos.y + 0.9, playerPos.z));
+      if (dist < 0.85) {
+        sounds.playArrowHit();
+        onPlayerDamage(3);
+        this.spawnParticleBurst(arr.pos.x, arr.pos.y, arr.pos.z, '#ef4444', 6);
+        this.scene.remove(arr.mesh);
+        arr.mesh.geometry.dispose();
+        this.arrows.splice(i, 1);
+        continue;
+      }
+
+      // Hit solid block check
+      const bx = Math.floor(arr.pos.x);
+      const by = Math.floor(arr.pos.y);
+      const bz = Math.floor(arr.pos.z);
+      if (world.getBlock(bx, by, bz) !== BlockType.AIR && world.getBlock(bx, by, bz) !== BlockType.WATER) {
+        sounds.playArrowHit();
+        this.scene.remove(arr.mesh);
+        arr.mesh.geometry.dispose();
+        this.arrows.splice(i, 1);
+      }
+    }
+  }
+
   // Update mob AI, physics, animations, and combat
   public updateMobs(
     world: VoxelWorld,
@@ -425,16 +493,46 @@ export class EntityManager {
     dt: number,
     onPlayerDamage: (amount: number) => void,
     heldItemId?: ItemId | null,
-    gameMode: GameMode = 'survival'
+    gameMode: GameMode = 'survival',
+    timeOfDay: number = 0.5
   ) {
     const mobPos = new THREE.Vector3();
     const mobVel = new THREE.Vector3();
     const isTargetable = gameMode !== 'creative' && gameMode !== 'spectator';
     const isHardcore = gameMode === 'hardcore';
 
+    // Update arrows
+    this.updateArrows(dt, world, playerPos, onPlayerDamage);
+
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const mob = this.mobs[i];
       const ent = mob.entity;
+
+      // Daylight burning for zombies and skeletons when unshaded
+      if ((ent.type === 'zombie' || ent.type === 'skeleton') && timeOfDay >= 0.25 && timeOfDay <= 0.75) {
+        const topY = world.findHighestSolidY(Math.floor(ent.x), Math.floor(ent.z));
+        if (ent.y >= topY - 0.5) {
+          ent.burning = (ent.burning || 0) + dt;
+          if (Math.random() < 0.2) {
+            this.spawnParticleBurst(ent.x, ent.y + 1.2, ent.z, '#f97316', 2);
+          }
+          if (ent.burning >= 1.5) {
+            ent.burning = 0;
+            ent.health -= 1;
+            mob.flashTimer = 0.2;
+            mob.group.traverse((child) => {
+              if (child instanceof THREE.Mesh && child.material) {
+                child.material.color.set(0xff3333);
+              }
+            });
+            sounds.playMobHurt();
+            if (ent.health <= 0) {
+              this.killMob(i, world, true);
+              continue;
+            }
+          }
+        }
+      }
 
       // Hurt cooldown & hit flash
       if (ent.hurtCooldown > 0) {
@@ -492,7 +590,7 @@ export class EntityManager {
         if (isTargetable && distToPlayer < (isHardcore ? 22 : 18)) {
           const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
           ent.yaw = angle;
-          // Keep distance (around 8-12 blocks) and strafe
+          // Keep tactical archery distance (around 8-12 blocks) and strafe
           if (distToPlayer < 7) {
             ent.vx = -Math.sin(angle) * 1.8;
             ent.vz = -Math.cos(angle) * 1.8;
@@ -504,12 +602,11 @@ export class EntityManager {
             ent.vz = -Math.sin(angle) * 1.2;
           }
 
-          if (distToPlayer < 14 && Math.abs(dyToPlayer) < 3.0) {
+          if (distToPlayer < 16 && Math.abs(dyToPlayer) < 5.0) {
             if (ent.attackCooldown <= 0) {
-              const dmg = isHardcore ? 4 : 2;
-              onPlayerDamage(dmg);
-              sounds.playPlayerHurt();
-              ent.attackCooldown = isHardcore ? 1.4 : 2.0;
+              sounds.playArrowShoot();
+              this.spawnArrow(ent.x, ent.y + 1.2, ent.z, playerPos);
+              ent.attackCooldown = isHardcore ? 1.5 : 2.2;
             }
           }
         } else {
@@ -942,6 +1039,11 @@ export class EntityManager {
     this.mobs = [];
     this.droppedItems.forEach((drop) => this.scene.remove(drop.mesh));
     this.droppedItems = [];
+    this.arrows.forEach((arr) => {
+      this.scene.remove(arr.mesh);
+      arr.mesh.geometry.dispose();
+    });
+    this.arrows = [];
     if (this.particlePoints) {
       this.scene.remove(this.particlePoints);
       this.particlePoints.geometry.dispose();

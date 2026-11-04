@@ -221,8 +221,8 @@ export class Chunk {
 
             if (isWater) {
               for (const [cx, cy, cz] of face.corners) {
-                // Slightly lower water surface
-                const actualY = face.dir[1] > 0 ? y + 0.88 : y + cy;
+                // Slightly lower water surface (authentic Minecraft 0.90 block water height)
+                const actualY = face.dir[1] > 0 ? y + 0.90 : y + cy;
                 waterPositions.push(x + cx, actualY, z + cz);
                 waterNormals.push(...face.dir);
               }
@@ -359,6 +359,7 @@ export class Chunk {
       waterGeom.computeBoundingSphere();
 
       this.waterMesh = new THREE.Mesh(waterGeom, waterMaterial);
+      this.waterMesh.renderOrder = 2;
       this.waterMesh.receiveShadow = true;
       this.group.add(this.waterMesh);
     }

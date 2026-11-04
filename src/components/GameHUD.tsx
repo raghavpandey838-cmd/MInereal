@@ -44,6 +44,11 @@ interface GameHUDProps {
   onMineStart?: () => void;
   onMineStop?: () => void;
   onInteract?: () => void;
+  onOpenSettings?: () => void;
+  onToggleCameraMode?: () => void;
+  cameraMode?: 'first-person' | 'third-person-back' | 'third-person-front';
+  weather?: string;
+  timeOfDay?: number;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -82,6 +87,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onMineStart,
   onMineStop,
   onInteract,
+  onOpenSettings,
+  onToggleCameraMode,
+  cameraMode = 'first-person',
+  weather = 'clear',
+  timeOfDay = 0.5,
 }) => {
   const [guiScale, setGuiScale] = useState<'compact' | 'normal'>('compact');
   const selectedItem = hotbar[selectedIndex] || null;
@@ -388,6 +398,37 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           >
             📐 {guiScale === 'compact' ? 'MINI' : 'FULL'}
           </button>
+
+          {/* Camera Perspective Toggle [F5] */}
+          {onToggleCameraMode && (
+            <button
+              onClick={() => {
+                sounds.playPop();
+                onToggleCameraMode();
+              }}
+              className="mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer text-amber-200 border border-amber-400/50"
+              title="Switch Camera Perspective (F5): 1st Person / 3rd Person Back / 3rd Person Front"
+            >
+              <span>🎥</span>
+              <span className="hidden sm:inline">
+                {cameraMode === 'first-person' ? '1st' : cameraMode === 'third-person-back' ? '3rd-B' : '3rd-F'}
+              </span>
+            </button>
+          )}
+
+          {/* Settings & Graphics Modal */}
+          {onOpenSettings && (
+            <button
+              onClick={() => {
+                sounds.playPop();
+                onOpenSettings();
+              }}
+              className="mc-btn px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold cursor-pointer text-cyan-200 border border-cyan-400/50"
+              title="Open Graphics & Game Settings"
+            >
+              <span>⚙️</span>
+            </button>
+          )}
 
           {/* Mobile On-Screen Controls Toggle */}
           <button

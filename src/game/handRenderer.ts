@@ -24,6 +24,10 @@ export class HandRenderer {
     this.updateHeldItem(null);
   }
 
+  public setVisible(visible: boolean) {
+    this.handGroup.visible = visible;
+  }
+
   public swing() {
     if (!this.isSwinging) {
       this.isSwinging = true;

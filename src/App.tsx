@@ -36,8 +36,11 @@ import { MobileControls } from './components/MobileControls';
 import { AdvancementsModal } from './components/AdvancementsModal';
 import { CreativeToolType } from './components/BuildMenuModal';
 import { Advancement, INITIAL_ADVANCEMENTS } from './game/advancements';
+import { SettingsModal, GameSettings, CameraMode, DEFAULT_SETTINGS } from './components/SettingsModal';
+import { WeatherManager } from './game/weather';
+import { PlayerCharacterModel } from './game/playerModel';
 
-type ModalType = 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'build' | 'advancements';
+type ModalType = 'none' | 'inventory' | 'crafting' | 'furnace' | 'chest' | 'build' | 'advancements' | 'settings';
 
 interface HistoryStep {
   x: number;
@@ -137,6 +140,9 @@ export default function App() {
     return inv;
   });
 
+  // Game Graphics, Environment & Perspective Settings
+  const [gameSettings, setGameSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
+
   // Chest storage 27 slots
   const [chestSlots, setChestSlots] = useState<(ItemStack | null)[]>(() => new Array(27).fill(null));
 
@@ -147,6 +153,8 @@ export default function App() {
     camera: THREE.PerspectiveCamera;
     world: VoxelWorld;
     sky: DayNightCycle;
+    weather: WeatherManager;
+    playerModel: PlayerCharacterModel;
     entities: EntityManager;
     vehicles: VehicleManager;
     hand: HandRenderer;
@@ -169,6 +177,8 @@ export default function App() {
     torchLights: THREE.PointLight[];
     lastUiUpdate: number;
     lastChunkCheck: number;
+    lastFallingBlockCheck?: number;
+    headBobPhase?: number;
     wasInWater?: boolean;
     lastDrownTime?: number;
   } | null>(null);
@@ -241,11 +251,17 @@ export default function App() {
     // 3. Day / Night Cycle with Sun, Moon, Stars
     const sky = new DayNightCycle(scene);
 
-    // 4. Mobs & Entity Manager
+    // 4. Weather & Environmental Effects Manager (Rain, Snow, Lightning, Wind)
+    const weather = new WeatherManager(scene);
+
+    // 5. Mobs & Entity Manager
     const entities = new EntityManager(scene);
 
-    // 5. Vehicles Manager (Car, Bike, Boat)
+    // 6. Vehicles Manager (Car, Bike, Boat)
     const vehicles = new VehicleManager(scene);
+
+    // 7. Full 3D Player Character Model for 3rd-person perspectives
+    const playerModel = new PlayerCharacterModel(scene);
 
     // Guaranteed dry land landing area
     const safeSpawn = world.findSafeDryLandSpawn(0, 0);
@@ -264,7 +280,7 @@ export default function App() {
     entities.spawnMob('zombie', safeSpawn.x + 16, world.findHighestSolidY(safeSpawn.x + 16, safeSpawn.z + 16) + 1, safeSpawn.z + 16);
     entities.spawnMob('creeper', safeSpawn.x - 14, world.findHighestSolidY(safeSpawn.x - 14, safeSpawn.z - 12) + 1, safeSpawn.z - 12);
 
-    // 6. Hand Renderer & Block Highlighter
+    // 8. Hand Renderer & Block Highlighter
     const hand = new HandRenderer(camera);
     const highlighter = new BlockHighlightManager(scene, world.opaqueMaterial.map as THREE.CanvasTexture);
 
@@ -282,6 +298,8 @@ export default function App() {
       camera,
       world,
       sky,
+      weather,
+      playerModel,
       entities,
       vehicles,
       hand,
@@ -304,6 +322,8 @@ export default function App() {
       torchLights: [],
       lastUiUpdate: 0,
       lastChunkCheck: 0,
+      lastFallingBlockCheck: 0,
+      headBobPhase: 0,
     };
 
     // Resize Handler with VisualViewport and DPR support for flawless mobile and desktop resolution
@@ -360,6 +380,8 @@ export default function App() {
       sounds.stopAmbientMusic();
       world.dispose();
       sky.dispose();
+      weather.dispose();
+      playerModel.dispose();
       entities.dispose();
       vehicles.dispose();
       hand.dispose();
@@ -453,6 +475,54 @@ export default function App() {
     setBuildHistory((prev) => prev.slice(0, -1));
     sounds.playBlockBreak(BlockType.STONE);
   }, [buildHistory]);
+
+  // Update Game Graphics, Audio, Environment & Camera Settings
+  const handleUpdateSettings = useCallback((newSettings: Partial<GameSettings>) => {
+    setGameSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+      const engine = engineRef.current;
+      if (engine) {
+        if (newSettings.isAutoDayNight !== undefined) {
+          engine.sky.isAutoCycle = updated.isAutoDayNight;
+        }
+        if (newSettings.renderDistance !== undefined) {
+          engine.world.renderDistance = updated.renderDistance;
+          engine.world.updateChunksAroundPlayer(engine.playerPos.x, engine.playerPos.z);
+        }
+        if (newSettings.shadows !== undefined) {
+          if (updated.shadows === 'off') {
+            engine.renderer.shadowMap.enabled = false;
+          } else {
+            engine.renderer.shadowMap.enabled = true;
+            engine.renderer.shadowMap.type =
+              updated.shadows === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+          }
+        }
+        if (newSettings.fov !== undefined) {
+          engine.camera.fov = updated.fov;
+          engine.camera.updateProjectionMatrix();
+        }
+        if (newSettings.weather !== undefined) {
+          engine.weather.setWeather(updated.weather);
+        }
+      }
+      return updated;
+    });
+  }, []);
+
+  // Cycle Camera Mode (1st Person -> 3rd Person Back -> 3rd Person Front)
+  const handleToggleCameraMode = useCallback(() => {
+    setGameSettings((prev) => {
+      const nextMode: CameraMode =
+        prev.cameraMode === 'first-person'
+          ? 'third-person-back'
+          : prev.cameraMode === 'third-person-back'
+          ? 'third-person-front'
+          : 'first-person';
+      sounds.playPop();
+      return { ...prev, cameraMode: nextMode };
+    });
+  }, []);
 
   // Select Structure from Build Menu
   const handleSelectStructure = (template: StructureTemplate) => {
@@ -813,8 +883,21 @@ export default function App() {
         keys,
       } = engine;
 
-      // 1. Day / Night cycle
-      sky.update(dt, playerPos);
+      // 1. Day / Night cycle & Dynamic Weather System & World Shader Uniforms
+      world.timeUniform.value = time * 0.001;
+      world.windUniform.value = gameSettings.windSway ? 1.0 : 0.0;
+      engine.weather.setWeather(gameSettings.weather);
+      const isAboveGround =
+        playerPos.y >= world.findHighestSolidY(Math.floor(playerPos.x), Math.floor(playerPos.z));
+      engine.weather.update(dt, playerPos, sky.timeOfDay, isAboveGround);
+      sky.update(
+        dt,
+        playerPos,
+        gameSettings.weather,
+        engine.weather.isLightningFlashing,
+        engine.weather.windSpeed,
+        engine.weather.windAngle
+      );
 
       // 2. Dynamic Wide Map Streaming: stream chunks around player (Anti-Lag: checked every 250ms)
       if (time - (engine.lastChunkCheck || 0) > 250) {
@@ -1039,11 +1122,53 @@ export default function App() {
           }
         }
 
-        // Camera position (eye height = 1.62m)
-        camera.position.set(playerPos.x, playerPos.y + 1.62, playerPos.z);
-        camera.rotation.order = 'YXZ';
-        camera.rotation.y = engine.cameraYaw;
-        camera.rotation.x = engine.cameraPitch;
+        // Realistic Head Bobbing & Dynamic Sprint FOV
+        if (moveRes.isGrounded && isMovingHoriz && !isFlying) {
+          engine.headBobPhase = (engine.headBobPhase || 0) + (isSprinting ? 14 : 9) * dt;
+        } else {
+          engine.headBobPhase = 0;
+        }
+        const headBob = Math.sin(engine.headBobPhase || 0) * (isSprinting ? 0.05 : 0.03);
+
+        const targetFov = isSprinting ? gameSettings.fov + 8 : gameSettings.fov;
+        if (Math.abs(camera.fov - targetFov) > 0.1) {
+          camera.fov += (targetFov - camera.fov) * 8.0 * dt;
+          camera.updateProjectionMatrix();
+        }
+
+        // Camera Modes (1st-person, 3rd-person back with terrain wall collision, 3rd-person front)
+        if (gameSettings.cameraMode === 'first-person') {
+          camera.position.set(playerPos.x, playerPos.y + 1.62 + headBob, playerPos.z);
+          camera.rotation.order = 'YXZ';
+          camera.rotation.y = engine.cameraYaw;
+          camera.rotation.x = engine.cameraPitch;
+          hand.setVisible(true);
+        } else if (gameSettings.cameraMode === 'third-person-back') {
+          hand.setVisible(false);
+          const eyePos = new THREE.Vector3(playerPos.x, playerPos.y + 1.62, playerPos.z);
+          const lookEuler = new THREE.Euler(engine.cameraPitch, engine.cameraYaw, 0, 'YXZ');
+          const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(lookEuler);
+          const maxDist = 3.5;
+          const backRay = world.raycast(eyePos, lookDir.clone().negate(), maxDist);
+          const actualDist = backRay.hit ? Math.max(0.6, backRay.distance - 0.25) : maxDist;
+          camera.position.copy(eyePos.clone().add(lookDir.clone().negate().multiplyScalar(actualDist)));
+          camera.rotation.order = 'YXZ';
+          camera.rotation.y = engine.cameraYaw;
+          camera.rotation.x = engine.cameraPitch;
+        } else {
+          // Third-person front
+          hand.setVisible(false);
+          const eyePos = new THREE.Vector3(playerPos.x, playerPos.y + 1.62, playerPos.z);
+          const lookEuler = new THREE.Euler(engine.cameraPitch, engine.cameraYaw, 0, 'YXZ');
+          const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(lookEuler);
+          const maxDist = 3.0;
+          const frontRay = world.raycast(eyePos, lookDir, maxDist);
+          const actualDist = frontRay.hit ? Math.max(0.6, frontRay.distance - 0.25) : maxDist;
+          camera.position.copy(eyePos.clone().add(lookDir.clone().multiplyScalar(actualDist)));
+          camera.rotation.order = 'YXZ';
+          camera.rotation.y = engine.cameraYaw + Math.PI;
+          camera.rotation.x = -engine.cameraPitch;
+        }
 
       }
 
@@ -1214,7 +1339,7 @@ export default function App() {
         engine.miningProgress = 0;
       }
 
-      // 8. Update Mobs AI & Combat (Food following & grazing)
+      // 8. Update Mobs AI & Combat (Archery projectiles, daytime sunlight burning, food following)
       const currentHeldId = inventory[selectedHotbarIndex]?.id || null;
       entities.updateMobs(
         world,
@@ -1224,7 +1349,8 @@ export default function App() {
           applyPlayerDamage(damage);
         },
         currentHeldId,
-        gameMode
+        gameMode,
+        sky.timeOfDay
       );
 
       // 9. Update Dropped Items (vacuum pickup)
@@ -1253,16 +1379,44 @@ export default function App() {
         });
       });
 
-      // 10. Update Particles
+      // 10. Realistic Gravity Falling Blocks (Sand & Gravel fall dynamically)
+      if (time - (engine.lastFallingBlockCheck || 0) > 500) {
+        engine.lastFallingBlockCheck = time;
+        world.checkAndDropFallingBlocks(
+          playerPos.x,
+          playerPos.z,
+          (bx, by, bz, col) => {
+            entities.spawnParticleBurst(bx + 0.5, by + 0.5, bz + 0.5, col, 4);
+          }
+        );
+      }
+
+      // 11. Full 3D Player Character Model (3rd-person back & front animation)
+      const hasArmor = playerStats.armor >= 6;
+      const hasHelmet = playerStats.armor >= 10;
+      engine.playerModel.update(
+        playerPos,
+        engine.cameraYaw,
+        engine.cameraPitch,
+        isMoving,
+        !!(keys['ControlLeft'] || keys['ControlRight']),
+        engine.isMining,
+        currentHeldId,
+        hasArmor,
+        hasHelmet,
+        gameSettings.cameraMode !== 'first-person'
+      );
+
+      // 12. Update Particles & Projectiles
       entities.updateParticles(dt);
 
-      // 11. Render 3D Scene
+      // 13. Render Ultra-Realistic 3D Scene
       engine.renderer.render(engine.scene, engine.camera);
     };
 
     animId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animId);
-  }, [gameState, activeModal, gameMode, selectedHotbarIndex, applyPlayerDamage, inventory, isFlying]);
+  }, [gameState, activeModal, gameMode, selectedHotbarIndex, applyPlayerDamage, inventory, isFlying, gameSettings]);
 
   // Action: Start Mining block or attack mob (Shared between Mouse and Mobile button)
   const handleMineStart = () => {
@@ -1752,6 +1906,13 @@ export default function App() {
         return;
       }
 
+      // F5 Camera Perspective Switcher (1st person -> 3rd person back -> 3rd person front)
+      if (code === 'F5') {
+        e.preventDefault();
+        handleToggleCameraMode();
+        return;
+      }
+
       // Toggle Flight Mode [Key F]
       if ((code === 'KeyF' || key === 'f') && gameState === 'playing' && activeModal === 'none') {
         e.preventDefault();
@@ -1849,7 +2010,7 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [gameState, activeModal, handleUndo]);
+  }, [gameState, activeModal, handleUndo, handleToggleCameraMode]);
 
   // World Persistence Save
   const handleSaveWorld = useCallback(() => {
@@ -2061,6 +2222,16 @@ export default function App() {
           onMineStart={handleMineStart}
           onMineStop={handleMineStop}
           onInteract={handleInteract}
+          onOpenSettings={() => {
+            setActiveModal('settings');
+            if (document.pointerLockElement) {
+              document.exitPointerLock?.();
+            }
+          }}
+          onToggleCameraMode={handleToggleCameraMode}
+          cameraMode={gameSettings.cameraMode}
+          weather={gameSettings.weather}
+          timeOfDay={engineRef.current?.sky.timeOfDay ?? 0.5}
         />
       )}
 
@@ -2198,12 +2369,23 @@ export default function App() {
         onOpenAdvancements={() => {
           setActiveModal('advancements');
         }}
+        onOpenSettings={() => {
+          setActiveModal('settings');
+        }}
         onQuitToTitle={() => {
           handleSaveWorld();
           setGameState('title');
         }}
         gameMode={gameMode}
         onChangeGameMode={handleChangeGameMode}
+      />
+
+      {/* Ultra-Realistic Settings & Graphics Modal */}
+      <SettingsModal
+        isOpen={activeModal === 'settings'}
+        onClose={handleCloseModal}
+        settings={gameSettings}
+        onUpdateSettings={handleUpdateSettings}
       />
 
       {/* Death Screen */}

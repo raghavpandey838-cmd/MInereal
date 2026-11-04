@@ -14,6 +14,7 @@ interface PauseMenuProps {
   onToggleMute: () => void;
   onSaveWorld: () => void;
   onOpenAdvancements: () => void;
+  onOpenSettings?: () => void;
   onQuitToTitle: () => void;
   gameMode?: GameMode;
   onChangeGameMode?: (mode: GameMode) => void;
@@ -34,6 +35,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
   onToggleMute,
   onSaveWorld,
   onOpenAdvancements,
+  onOpenSettings,
   onQuitToTitle,
   gameMode = 'survival',
   onChangeGameMode,
@@ -77,6 +79,20 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
           <span>🏆</span>
           <span>View Advancements & Trophies</span>
         </button>
+
+        {/* Settings & Options Button */}
+        {onOpenSettings && (
+          <button
+            onClick={() => {
+              sounds.playPop();
+              onOpenSettings();
+            }}
+            className="mc-btn w-full py-2 font-bold text-xs cursor-pointer text-cyan-300 flex items-center justify-center gap-1.5 border border-cyan-400/50"
+          >
+            <span>⚙️</span>
+            <span>Settings & Graphics Options</span>
+          </button>
+        )}
 
         {/* In-Game Mode Switcher */}
         <div className="w-full flex flex-col gap-1">

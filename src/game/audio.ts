@@ -9,7 +9,20 @@ class SoundEngine {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
   private masterGain: GainNode | null = null;
+  private musicGain: GainNode | null = null;
+  private weatherGain: GainNode | null = null;
+  private sfxGain: GainNode | null = null;
+  private natureGain: GainNode | null = null;
   private musicInterval: number | null = null;
+  private rainNode: AudioBufferSourceNode | null = null;
+  private rainGainNode: GainNode | null = null;
+  private windNode: AudioBufferSourceNode | null = null;
+  private windGainNode: GainNode | null = null;
+  private masterVol: number = 0.8;
+  private musicVol: number = 0.5;
+  private weatherVol: number = 0.7;
+  private sfxVol: number = 0.8;
+  private natureVol: number = 0.6;
 
   private initCtx(): boolean {
     if (!this.ctx) {
@@ -17,9 +30,26 @@ class SoundEngine {
         const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         if (!AudioCtx) return false;
         this.ctx = new AudioCtx();
+
         this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = 0.3;
+        this.masterGain.gain.value = this.isMuted ? 0 : this.masterVol;
         this.masterGain.connect(this.ctx.destination);
+
+        this.sfxGain = this.ctx.createGain();
+        this.sfxGain.gain.value = this.sfxVol;
+        this.sfxGain.connect(this.masterGain);
+
+        this.musicGain = this.ctx.createGain();
+        this.musicGain.gain.value = this.musicVol;
+        this.musicGain.connect(this.masterGain);
+
+        this.weatherGain = this.ctx.createGain();
+        this.weatherGain.gain.value = this.weatherVol;
+        this.weatherGain.connect(this.masterGain);
+
+        this.natureGain = this.ctx.createGain();
+        this.natureGain.gain.value = this.natureVol;
+        this.natureGain.connect(this.masterGain);
       } catch {
         return false;
       }
@@ -30,10 +60,55 @@ class SoundEngine {
     return !!(this.ctx && this.masterGain);
   }
 
+  public setMasterVolume(v: number) {
+    this.masterVol = Math.max(0, Math.min(1, v));
+    if (this.masterGain && !this.isMuted) {
+      this.masterGain.gain.setValueAtTime(this.masterVol, this.ctx!.currentTime);
+    }
+  }
+
+  public setMusicVolume(v: number) {
+    this.musicVol = Math.max(0, Math.min(1, v));
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setValueAtTime(this.musicVol, this.ctx.currentTime);
+    }
+  }
+
+  public setWeatherVolume(v: number) {
+    this.weatherVol = Math.max(0, Math.min(1, v));
+    if (this.weatherGain && this.ctx) {
+      this.weatherGain.gain.setValueAtTime(this.weatherVol, this.ctx.currentTime);
+    }
+  }
+
+  public setSfxVolume(v: number) {
+    this.sfxVol = Math.max(0, Math.min(1, v));
+    if (this.sfxGain && this.ctx) {
+      this.sfxGain.gain.setValueAtTime(this.sfxVol, this.ctx.currentTime);
+    }
+  }
+
+  public setNatureVolume(v: number) {
+    this.natureVol = Math.max(0, Math.min(1, v));
+    if (this.natureGain && this.ctx) {
+      this.natureGain.gain.setValueAtTime(this.natureVol, this.ctx.currentTime);
+    }
+  }
+
+  public getVolumes() {
+    return {
+      master: this.masterVol,
+      music: this.musicVol,
+      weather: this.weatherVol,
+      sfx: this.sfxVol,
+      nature: this.natureVol,
+    };
+  }
+
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
     if (this.masterGain) {
-      this.masterGain.gain.value = this.isMuted ? 0 : 0.3;
+      this.masterGain.gain.value = this.isMuted ? 0 : this.masterVol;
     }
     return this.isMuted;
   }
@@ -727,6 +802,249 @@ class SoundEngine {
     // Play initial gentle chord, then periodic ambient intervals
     setTimeout(playAmbientChord, 2000);
     this.musicInterval = window.setInterval(playAmbientChord, 45000);
+  }
+
+  // Thunder strike: sharp crack followed by low-frequency resonant rumble
+  public playThunder(distanceRatio: number = 0.5) {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    // A. Crack (high-impact sharp transient)
+    const crackNoise = this.createNoiseBuffer(0.2);
+    if (crackNoise) {
+      const crackSource = ctx.createBufferSource();
+      crackSource.buffer = crackNoise;
+      const crackFilter = ctx.createBiquadFilter();
+      crackFilter.type = 'highpass';
+      crackFilter.frequency.setValueAtTime(600, now);
+      const crackGain = ctx.createGain();
+      const peakVol = Math.max(0.1, 0.45 * (1 - distanceRatio * 0.5));
+      crackGain.gain.setValueAtTime(peakVol, now);
+      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      crackSource.connect(crackFilter);
+      crackFilter.connect(crackGain);
+      crackGain.connect(this.weatherGain || this.masterGain!);
+      crackSource.start(now);
+      crackSource.stop(now + 0.2);
+    }
+
+    // B. Low-frequency rolling rumble (sub-bass 40Hz - 90Hz)
+    const rumbleNoise = this.createNoiseBuffer(2.4);
+    if (rumbleNoise) {
+      const rumbleSource = ctx.createBufferSource();
+      rumbleSource.buffer = rumbleNoise;
+      const rumbleFilter = ctx.createBiquadFilter();
+      rumbleFilter.type = 'lowpass';
+      rumbleFilter.frequency.setValueAtTime(140, now);
+      rumbleFilter.frequency.exponentialRampToValueAtTime(50, now + 2.2);
+      const rumbleGain = ctx.createGain();
+      rumbleGain.gain.setValueAtTime(0.01, now);
+      rumbleGain.gain.linearRampToValueAtTime(0.4, now + 0.15);
+      rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + 2.4);
+      rumbleSource.connect(rumbleFilter);
+      rumbleFilter.connect(rumbleGain);
+      rumbleGain.connect(this.weatherGain || this.masterGain!);
+      rumbleSource.start(now);
+      rumbleSource.stop(now + 2.5);
+    }
+  }
+
+  // Dynamic Rain Soundscape loop
+  public updateRainSound(intensity: number) {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+
+    if (intensity <= 0.02) {
+      if (this.rainGainNode) {
+        this.rainGainNode.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4);
+      }
+      return;
+    }
+
+    if (!this.rainNode) {
+      const buffer = this.createNoiseBuffer(3.0);
+      if (!buffer) return;
+      this.rainNode = ctx.createBufferSource();
+      this.rainNode.buffer = buffer;
+      this.rainNode.loop = true;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1200, ctx.currentTime);
+      filter.Q.setValueAtTime(0.8, ctx.currentTime);
+
+      this.rainGainNode = ctx.createGain();
+      this.rainGainNode.gain.setValueAtTime(0.0001, ctx.currentTime);
+
+      this.rainNode.connect(filter);
+      filter.connect(this.rainGainNode);
+      this.rainGainNode.connect(this.weatherGain || this.masterGain!);
+      try {
+        this.rainNode.start();
+      } catch {
+        // ignore
+      }
+    }
+
+    if (this.rainGainNode) {
+      const targetGain = Math.min(0.35, intensity * 0.32);
+      this.rainGainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.5);
+    }
+  }
+
+  // Dynamic Wind Soundscape loop
+  public updateWindSound(intensity: number) {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+
+    if (intensity <= 0.05) {
+      if (this.windGainNode) {
+        this.windGainNode.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5);
+      }
+      return;
+    }
+
+    if (!this.windNode) {
+      const buffer = this.createNoiseBuffer(3.0);
+      if (!buffer) return;
+      this.windNode = ctx.createBufferSource();
+      this.windNode.buffer = buffer;
+      this.windNode.loop = true;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(350, ctx.currentTime);
+
+      this.windGainNode = ctx.createGain();
+      this.windGainNode.gain.setValueAtTime(0.0001, ctx.currentTime);
+
+      this.windNode.connect(filter);
+      filter.connect(this.windGainNode);
+      this.windGainNode.connect(this.weatherGain || this.masterGain!);
+      try {
+        this.windNode.start();
+      } catch {
+        // ignore
+      }
+    }
+
+    if (this.windGainNode) {
+      const targetGain = Math.min(0.25, intensity * 0.22);
+      this.windGainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.5);
+    }
+  }
+
+  // Morning songbird chirp
+  public playBirdChirp() {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    const baseFreq = 2600 + Math.random() * 400;
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.linearRampToValueAtTime(baseFreq + 600, now + 0.04);
+    osc.frequency.linearRampToValueAtTime(baseFreq - 200, now + 0.09);
+    osc.frequency.linearRampToValueAtTime(baseFreq + 400, now + 0.14);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.08, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+    osc.connect(gain);
+    gain.connect(this.natureGain || this.masterGain!);
+    osc.start(now);
+    osc.stop(now + 0.17);
+  }
+
+  // Evening cricket chirp
+  public playCricket() {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(4500, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.04, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+    osc.connect(gain);
+    gain.connect(this.natureGain || this.masterGain!);
+    osc.start(now);
+    osc.stop(now + 0.06);
+  }
+
+  // Falling sand/gravel impact thud
+  public playBlockFall() {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.createNoiseBuffer(0.18);
+    if (!noise.buffer) return;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(420, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain || this.masterGain!);
+    noise.start(now);
+    noise.stop(now + 0.18);
+  }
+
+  // Arrow shoot twang & hit thud
+  public playArrowShoot() {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(420, now);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.12);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain || this.masterGain!);
+    osc.start(now);
+    osc.stop(now + 0.13);
+  }
+
+  public playArrowHit() {
+    if (this.isMuted || !this.initCtx()) return;
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(260, now);
+    osc.frequency.exponentialRampToValueAtTime(90, now + 0.08);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain || this.masterGain!);
+    osc.start(now);
+    osc.stop(now + 0.09);
   }
 
   public stopAmbientMusic() {

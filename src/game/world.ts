@@ -17,6 +17,7 @@ export interface VoxelRaycastHit {
   z: number;
   normal: [number, number, number];
   block: BlockType;
+  distance: number;
 }
 
 export class VoxelWorld {
@@ -28,6 +29,9 @@ export class VoxelWorld {
   public waterMaterial: THREE.MeshStandardMaterial;
   public modifiedBlocks: Map<string, BlockType> = new Map();
   public worldRadius: number = 3; // Vast radius: 7x7 chunks = 112x112 blocks loaded simultaneously
+  public renderDistance: number = 3;
+  public timeUniform: { value: number } = { value: 0 };
+  public windUniform: { value: number } = { value: 1.0 };
   private lastLoadedCX: number = 99999;
   private lastLoadedCZ: number = 99999;
 
@@ -40,19 +44,24 @@ export class VoxelWorld {
 
     this.opaqueMaterial = new THREE.MeshStandardMaterial({
       map: atlasTexture,
-      roughness: 0.9,
+      roughness: 0.88,
       metalness: 0.05,
       vertexColors: true,
       alphaTest: 0.5,
       shadowSide: THREE.DoubleSide,
     });
 
+    // 100% Rock-solid, crisp Minecraft blocks (no waving on solid terrain blocks!)
+    // Opaque blocks remain static, clean, and rigid.
+
+    // Authentic Minecraft water material: vibrant blue, translucent, clean specular reflection
     this.waterMaterial = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0xffffff),
       map: atlasTexture,
-      roughness: 0.1,
-      metalness: 0.1,
+      roughness: 0.15,
+      metalness: 0.08,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.82,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
@@ -322,6 +331,7 @@ export class VoxelWorld {
   }
 
   // Populate trees and flowers across chunks
+  // Populate trees, flowers, and procedural structures across chunks
   private populateWorldFeatures(centerCX: number, centerCZ: number) {
     for (let dx = -this.worldRadius; dx <= this.worldRadius; dx++) {
       for (let dz = -this.worldRadius; dz <= this.worldRadius; dz++) {
@@ -330,7 +340,32 @@ export class VoxelWorld {
         const startWX = cx * CHUNK_SIZE_X;
         const startWZ = cz * CHUNK_SIZE_Z;
 
-        // Tree scattering
+        // 1. Procedural Landmark Structures (Unique per chunk seed)
+        const structHash = Math.abs(Math.sin(cx * 12.9898 + cz * 78.233 + this.seed * 0.05) * 43758.5453);
+        const structRnd = Math.floor(structHash) % 20;
+
+        const structCenterX = startWX + 8;
+        const structCenterZ = startWZ + 8;
+        const structSurfaceY = this.findHighestSolidY(structCenterX, structCenterZ);
+
+        if (structRnd === 0 && structSurfaceY > SEA_LEVEL + 2) {
+          // Ancient Stone Ruins with Obsidian & Hidden Chest
+          this.buildAncientRuins(structCenterX, structSurfaceY + 1, structCenterZ);
+        } else if (structRnd === 1 && structSurfaceY > SEA_LEVEL) {
+          // Cozy Wooden Explorer Cabin
+          this.buildExplorerCabin(structCenterX, structSurfaceY + 1, structCenterZ);
+        } else if (structRnd === 2 && structSurfaceY <= SEA_LEVEL) {
+          // Sunken Ocean Ruins with Glowing Sea Lanterns
+          this.buildOceanRuins(structCenterX, Math.max(8, structSurfaceY), structCenterZ);
+        } else if (structRnd === 3 && structSurfaceY > SEA_LEVEL + 1) {
+          // Desert Outpost / Mini Pyramid in sand biomes
+          const groundType = this.getBlock(structCenterX, structSurfaceY, structCenterZ);
+          if (groundType === BlockType.SAND) {
+            this.buildDesertOutpost(structCenterX, structSurfaceY + 1, structCenterZ);
+          }
+        }
+
+        // 2. Tree & Flower scattering
         for (let lx = 3; lx < CHUNK_SIZE_X - 3; lx += 4) {
           for (let lz = 3; lz < CHUNK_SIZE_Z - 3; lz += 4) {
             const wx = startWX + lx;
@@ -355,6 +390,169 @@ export class VoxelWorld {
         }
       }
     }
+  }
+
+  // Ancient Stone Ruins: stone brick pillars, mossy arches, obsidian altar, and treasure chest
+  private buildAncientRuins(baseX: number, baseY: number, baseZ: number) {
+    const pillarHeights = [3, 5, 4, 2];
+    const offsets = [
+      [-2, -2],
+      [2, -2],
+      [-2, 2],
+      [2, 2],
+    ];
+
+    offsets.forEach(([ox, oz], idx) => {
+      const h = pillarHeights[idx];
+      for (let y = 0; y < h; y++) {
+        const isMossy = (y + idx) % 2 === 0;
+        this.setRawBlockInChunk(baseX + ox, baseY + y, baseZ + oz, isMossy ? BlockType.MOSSY_COBBLESTONE : BlockType.STONE_BRICKS);
+      }
+      this.setRawBlockInChunk(baseX + ox, baseY + h, baseZ + oz, BlockType.STONE_BRICKS);
+    });
+
+    // Broken cross-beam
+    for (let x = -2; x <= 0; x++) {
+      this.setRawBlockInChunk(baseX + x, baseY + 4, baseZ - 2, BlockType.STONE_BRICKS);
+    }
+
+    // Central Obsidian altar with torch and chest
+    this.setRawBlockInChunk(baseX, baseY, baseZ, BlockType.OBSIDIAN);
+    this.setRawBlockInChunk(baseX, baseY + 1, baseZ, BlockType.GOLD_BLOCK);
+    this.setRawBlockInChunk(baseX, baseY + 2, baseZ, BlockType.TORCH);
+    this.setRawBlockInChunk(baseX + 1, baseY, baseZ, BlockType.CHEST);
+  }
+
+  // Explorer Cabin: cozy wooden outpost with glass windows, crafting table, furnace & chest
+  private buildExplorerCabin(baseX: number, baseY: number, baseZ: number) {
+    // Floor
+    for (let ox = -2; ox <= 2; ox++) {
+      for (let oz = -2; oz <= 2; oz++) {
+        this.setRawBlockInChunk(baseX + ox, baseY - 1, baseZ + oz, BlockType.COBBLESTONE);
+      }
+    }
+
+    // Walls & Corner logs
+    for (let y = 0; y < 3; y++) {
+      for (let ox = -2; ox <= 2; ox++) {
+        for (let oz = -2; oz <= 2; oz++) {
+          const isEdge = ox === -2 || ox === 2 || oz === -2 || oz === 2;
+          const isCorner = (ox === -2 || ox === 2) && (oz === -2 || oz === 2);
+          const isDoor = ox === 0 && oz === 2 && (y === 0 || y === 1);
+          const isWindow = (ox === 0 && oz === -2 && y === 1) || (ox === -2 && oz === 0 && y === 1);
+
+          if (isCorner) {
+            this.setRawBlockInChunk(baseX + ox, baseY + y, baseZ + oz, BlockType.OAK_LOG);
+          } else if (isDoor) {
+            this.setRawBlockInChunk(baseX + ox, baseY + y, baseZ + oz, BlockType.AIR);
+          } else if (isWindow) {
+            this.setRawBlockInChunk(baseX + ox, baseY + y, baseZ + oz, BlockType.GLASS);
+          } else if (isEdge) {
+            this.setRawBlockInChunk(baseX + ox, baseY + y, baseZ + oz, BlockType.OAK_PLANKS);
+          } else {
+            this.setRawBlockInChunk(baseX + ox, baseY + y, baseZ + oz, BlockType.AIR);
+          }
+        }
+      }
+    }
+
+    // Roof
+    for (let ox = -2; ox <= 2; ox++) {
+      for (let oz = -2; oz <= 2; oz++) {
+        this.setRawBlockInChunk(baseX + ox, baseY + 3, baseZ + oz, BlockType.OAK_PLANKS);
+      }
+    }
+
+    // Interior furniture
+    this.setRawBlockInChunk(baseX - 1, baseY, baseZ - 1, BlockType.CRAFTING_TABLE);
+    this.setRawBlockInChunk(baseX + 1, baseY, baseZ - 1, BlockType.FURNACE);
+    this.setRawBlockInChunk(baseX + 1, baseY, baseZ + 1, BlockType.CHEST);
+    this.setRawBlockInChunk(baseX - 1, baseY + 1, baseZ, BlockType.TORCH);
+  }
+
+  // Desert Outpost: Sandstone pyramid outpost with terracotta glyphs and hidden loot
+  private buildDesertOutpost(baseX: number, baseY: number, baseZ: number) {
+    // 5x5 tiered sandstone base
+    for (let ox = -2; ox <= 2; ox++) {
+      for (let oz = -2; oz <= 2; oz++) {
+        this.setRawBlockInChunk(baseX + ox, baseY, baseZ + oz, BlockType.SANDSTONE);
+      }
+    }
+    // 3x3 second tier with orange terracotta
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oz = -1; oz <= 1; oz++) {
+        this.setRawBlockInChunk(baseX + ox, baseY + 1, baseZ + oz, BlockType.TERRACOTTA_ORANGE);
+      }
+    }
+    // Corner pillars
+    this.setRawBlockInChunk(baseX - 2, baseY + 1, baseZ - 2, BlockType.SANDSTONE);
+    this.setRawBlockInChunk(baseX + 2, baseY + 1, baseZ - 2, BlockType.SANDSTONE);
+    this.setRawBlockInChunk(baseX - 2, baseY + 1, baseZ + 2, BlockType.SANDSTONE);
+    this.setRawBlockInChunk(baseX + 2, baseY + 1, baseZ + 2, BlockType.SANDSTONE);
+
+    this.setRawBlockInChunk(baseX - 2, baseY + 2, baseZ - 2, BlockType.TORCH);
+    this.setRawBlockInChunk(baseX + 2, baseY + 2, baseZ - 2, BlockType.TORCH);
+    this.setRawBlockInChunk(baseX, baseY + 2, baseZ, BlockType.CHEST);
+  }
+
+  // Sunken Ocean Ruins: Glowing Sea Lantern underwater monument
+  private buildOceanRuins(baseX: number, baseY: number, baseZ: number) {
+    for (let y = 0; y < 4; y++) {
+      this.setRawBlockInChunk(baseX - 2, baseY + y, baseZ - 2, BlockType.STONE_BRICKS);
+      this.setRawBlockInChunk(baseX + 2, baseY + y, baseZ - 2, BlockType.STONE_BRICKS);
+      this.setRawBlockInChunk(baseX - 2, baseY + y, baseZ + 2, BlockType.STONE_BRICKS);
+      this.setRawBlockInChunk(baseX + 2, baseY + y, baseZ + 2, BlockType.STONE_BRICKS);
+    }
+    // Glowing sea lanterns atop underwater pillars
+    this.setRawBlockInChunk(baseX - 2, baseY + 4, baseZ - 2, BlockType.SEA_LANTERN);
+    this.setRawBlockInChunk(baseX + 2, baseY + 4, baseZ - 2, BlockType.SEA_LANTERN);
+    this.setRawBlockInChunk(baseX - 2, baseY + 4, baseZ + 2, BlockType.SEA_LANTERN);
+    this.setRawBlockInChunk(baseX + 2, baseY + 4, baseZ + 2, BlockType.SEA_LANTERN);
+
+    // Underwater ancient chest
+    this.setRawBlockInChunk(baseX, baseY, baseZ, BlockType.CHEST);
+  }
+
+  // Falling block physics simulation (Sand & Gravel dropping when unsupported)
+  public checkAndDropFallingBlocks(
+    centerX: number,
+    centerZ: number,
+    onDustParticle?: (x: number, y: number, z: number, color: string) => void
+  ): boolean {
+    const radius = 10;
+    const startX = Math.floor(centerX) - radius;
+    const endX = Math.floor(centerX) + radius;
+    const startZ = Math.floor(centerZ) - radius;
+    const endZ = Math.floor(centerZ) + radius;
+
+    let anyDropped = false;
+
+    for (let x = startX; x <= endX; x++) {
+      for (let z = startZ; z <= endZ; z++) {
+        for (let y = 2; y < CHUNK_HEIGHT - 2; y++) {
+          const block = this.getBlock(x, y, z);
+          if (block === BlockType.SAND || block === BlockType.GRAVEL) {
+            const below = this.getBlock(x, y - 1, z);
+            if (below === BlockType.AIR || below === BlockType.WATER) {
+              // Move block down by 1 unit
+              this.setBlock(x, y, z, below);
+              this.setBlock(x, y - 1, z, block);
+              anyDropped = true;
+
+              if (onDustParticle) {
+                const color = block === BlockType.SAND ? '#fde047' : '#94a3b8';
+                onDustParticle(x + 0.5, y - 0.2, z + 0.5, color);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (anyDropped) {
+      this.rebuildDirtyChunks();
+    }
+    return anyDropped;
   }
 
   private growTree(baseX: number, baseY: number, baseZ: number) {
@@ -562,6 +760,7 @@ export class VoxelWorld {
           z: mapZ,
           normal,
           block,
+          distance,
         };
       }
 
@@ -599,6 +798,7 @@ export class VoxelWorld {
       z: 0,
       normal: [0, 0, 0],
       block: BlockType.AIR,
+      distance: maxDistance,
     };
   }
 

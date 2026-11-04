@@ -356,11 +356,15 @@ export function createBlockAtlas(): THREE.CanvasTexture {
     return [180, 220, 255, 45]; // transparent glass body
   });
 
-  // 16. Water
+  // 16. Water (Vibrant authentic Minecraft blue with fluid wave streaks)
   drawTile(ctx, TileIndex.WATER, (x, y) => {
-    const wave = Math.sin((x + y) * 0.8);
-    const b = 210 + Math.floor(wave * 25);
-    return [30, 80, b, 200];
+    const wave = Math.sin((x * 0.75 + y * 0.95));
+    const wave2 = Math.cos((x * 1.2 - y * 0.8));
+    const ripple = wave * 0.6 + wave2 * 0.4;
+    const r = Math.max(16, Math.min(48, Math.floor(28 + ripple * 16)));
+    const g = Math.max(85, Math.min(155, Math.floor(115 + ripple * 30)));
+    const b = Math.max(215, Math.min(255, Math.floor(240 + ripple * 15)));
+    return [r, g, b, 245];
   });
 
   // Helper for ore spots
