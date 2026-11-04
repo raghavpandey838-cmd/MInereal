@@ -272,13 +272,8 @@ export default function App() {
     vehicles.spawnVehicle('bike', safeSpawn.x - 3, spawnY + 1, safeSpawn.z + 3, Math.PI / 4);
     vehicles.spawnVehicle('boat', safeSpawn.x + 15, 24, safeSpawn.z + 15, 0);
 
-    // Starter realistic animals on dry land
-    entities.spawnMob('cow', safeSpawn.x + 5, spawnY + 1, safeSpawn.z + 2);
-    entities.spawnMob('pig', safeSpawn.x - 4, spawnY + 1, safeSpawn.z + 3);
-    entities.spawnMob('sheep', safeSpawn.x + 3, spawnY + 1, safeSpawn.z - 4);
-    entities.spawnMob('chicken', safeSpawn.x - 2, spawnY + 1, safeSpawn.z - 3);
-    entities.spawnMob('zombie', safeSpawn.x + 16, world.findHighestSolidY(safeSpawn.x + 16, safeSpawn.z + 16) + 1, safeSpawn.z + 16);
-    entities.spawnMob('creeper', safeSpawn.x - 14, world.findHighestSolidY(safeSpawn.x - 14, safeSpawn.z - 12) + 1, safeSpawn.z - 12);
+    // Starter pack of realistic animals & perimeter hostiles
+    entities.spawnInitialPack(world, safeSpawn.x, safeSpawn.z, 'survival');
 
     // 8. Hand Renderer & Block Highlighter
     const hand = new HandRenderer(camera);
@@ -735,7 +730,7 @@ export default function App() {
   };
 
   // Spawn an interactive mob in creative mode
-  const handleSpawnMob = (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper') => {
+  const handleSpawnMob = (type: 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'creeper' | 'spider') => {
     const engine = engineRef.current;
     if (!engine) return;
 
@@ -1352,6 +1347,9 @@ export default function App() {
         gameMode,
         sky.timeOfDay
       );
+
+      // Natural dynamic mob spawning (Zombies/Skeletons/Creepers at night, Animals by day)
+      entities.updateMobSpawning(world, playerPos, sky.timeOfDay, gameMode, dt);
 
       // 9. Update Dropped Items (vacuum pickup)
       entities.updateDroppedItems(world, playerPos, dt, (dropped) => {
@@ -2132,6 +2130,9 @@ export default function App() {
     const safeSpawn = engine.world.findSafeDryLandSpawn(0, 0);
     engine.playerPos.set(safeSpawn.x + 0.5, safeSpawn.y + 1.6, safeSpawn.z + 0.5);
     engine.playerVel.set(0, 0, 0);
+
+    // Spawn mode-appropriate starter animals and perimeter hostiles
+    engine.entities.spawnInitialPack(engine.world, safeSpawn.x, safeSpawn.z, mode);
 
     setGameState('playing');
     engine.renderer.domElement.requestPointerLock();

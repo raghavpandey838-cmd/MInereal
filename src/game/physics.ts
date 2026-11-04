@@ -84,8 +84,8 @@ export class PhysicsEngine {
     const headBlock = world.getBlock(Math.floor(pos.x), Math.floor(pos.y + 1.5), Math.floor(pos.z));
     const inWater = feetBlock === BlockType.WATER || headBlock === BlockType.WATER;
 
-    // Step-up height (allows stepping over small ledges or slabs smoothly)
-    const stepHeight = canStep ? 0.55 : 0.0;
+    // Step-up height (allows stepping over full 1-block steps or slabs smoothly)
+    const stepHeight = canStep ? 1.05 : 0.0;
 
     // --- 1. Y AXIS (Vertical) ---
     const dy = vel.y * dt;
@@ -136,7 +136,7 @@ export class PhysicsEngine {
           maxZ: pos.z + halfWidth,
         };
         if (!this.checkCollision(world, stepBoxX)) {
-          pos.y += stepHeight;
+          pos.y = Math.floor(pos.y) + 1.0;
           pos.x += dx;
           stepped = true;
         }
@@ -172,7 +172,7 @@ export class PhysicsEngine {
           maxZ: pos.z + dz + halfWidth,
         };
         if (!this.checkCollision(world, stepBoxZ)) {
-          pos.y += stepHeight;
+          pos.y = Math.floor(pos.y) + 1.0;
           pos.z += dz;
           stepped = true;
         }

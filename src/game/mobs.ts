@@ -24,6 +24,7 @@ export interface MobVisual {
   legBR?: THREE.Mesh;
   wingL?: THREE.Mesh; // Chicken wings
   wingR?: THREE.Mesh;
+  spiderLegs?: THREE.Mesh[]; // Spider 8 legs
   flashTimer: number;
 }
 
@@ -64,7 +65,7 @@ export class EntityManager {
 
   // Spawn a mob
   public spawnMob(
-    type: 'zombie' | 'skeleton' | 'creeper' | 'pig' | 'cow' | 'sheep' | 'chicken',
+    type: 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'pig' | 'cow' | 'sheep' | 'chicken',
     x: number,
     y: number,
     z: number
@@ -84,6 +85,7 @@ export class EntityManager {
     let legBR: THREE.Mesh | undefined;
     let wingL: THREE.Mesh | undefined;
     let wingR: THREE.Mesh | undefined;
+    let spiderLegs: THREE.Mesh[] | undefined;
 
     let maxHealth = 20;
 
@@ -324,7 +326,7 @@ export class EntityManager {
       rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.08), beakMat);
       rightLeg.position.set(0.1, 0.14, 0.04);
       group.add(rightLeg);
-    } else {
+    } else if (type === 'pig') {
       // Pig (Authentic Minecraft pink pig with protruding snout, nostrils, and black/white eyes)
       maxHealth = 10;
       const pigMat = new THREE.MeshStandardMaterial({ color: 0xf29bb0, roughness: 0.8 });
@@ -376,6 +378,48 @@ export class EntityManager {
       legBR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.35, 0.18), legMat);
       legBR.position.set(0.2, 0.18, -0.3);
       group.add(legBR);
+    } else if (type === 'spider') {
+      // Spider (Authentic Minecraft spider with red eyes, flat abdomen and 8 legs)
+      maxHealth = 16;
+      const spiderMat = new THREE.MeshStandardMaterial({ color: 0x1f1917, roughness: 0.85 });
+      // Head
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.35, 0.45), spiderMat);
+      head.position.set(0, 0.45, 0.45);
+      group.add(head);
+
+      // Red glowing spider eyes
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.02), eyeMat);
+      eyeL.position.set(-0.12, 0.48, 0.68);
+      group.add(eyeL);
+      const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.02), eyeMat);
+      eyeR.position.set(0.12, 0.48, 0.68);
+      group.add(eyeR);
+
+      // Abdomen
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 0.85), spiderMat);
+      body.position.set(0, 0.48, -0.2);
+      group.add(body);
+
+      // 8 Articulated Legs
+      spiderLegs = [];
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x181312, roughness: 0.9 });
+      for (let legIdx = 0; legIdx < 8; legIdx++) {
+        const isRight = legIdx >= 4;
+        const sideIdx = legIdx % 4;
+        const legGeom = new THREE.BoxGeometry(0.08, 0.08, 0.65);
+        const leg = new THREE.Mesh(legGeom, legMat);
+        const zOff = 0.25 - sideIdx * 0.2;
+        const xOff = isRight ? 0.38 : -0.38;
+        leg.position.set(xOff, 0.32, zOff);
+        leg.rotation.y = (isRight ? 1 : -1) * (0.4 + sideIdx * 0.15);
+        leg.rotation.z = isRight ? -0.35 : 0.35;
+        group.add(leg);
+        spiderLegs.push(leg);
+      }
+    } else {
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x477839 }));
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.75, 0.25), new THREE.MeshStandardMaterial({ color: 0x247596 }));
     }
 
     this.scene.add(group);
@@ -412,6 +456,7 @@ export class EntityManager {
       legBR,
       wingL,
       wingR,
+      spiderLegs,
       flashTimer: 0,
     };
 
@@ -508,13 +553,17 @@ export class EntityManager {
       const mob = this.mobs[i];
       const ent = mob.entity;
 
-      // Daylight burning for zombies and skeletons when unshaded
-      if ((ent.type === 'zombie' || ent.type === 'skeleton') && timeOfDay >= 0.25 && timeOfDay <= 0.75) {
+      // Check if feet are in water
+      const feetBlock = world.getBlock(Math.floor(ent.x), Math.floor(ent.y), Math.floor(ent.z));
+      const inWater = feetBlock === BlockType.WATER;
+
+      // Daylight burning for zombies and skeletons when unshaded and not in water
+      if ((ent.type === 'zombie' || ent.type === 'skeleton') && timeOfDay >= 0.25 && timeOfDay <= 0.75 && !inWater) {
         const topY = world.findHighestSolidY(Math.floor(ent.x), Math.floor(ent.z));
         if (ent.y >= topY - 0.5) {
           ent.burning = (ent.burning || 0) + dt;
-          if (Math.random() < 0.2) {
-            this.spawnParticleBurst(ent.x, ent.y + 1.2, ent.z, '#f97316', 2);
+          if (Math.random() < 0.25) {
+            this.spawnParticleBurst(ent.x, ent.y + 1.2, ent.z, '#f97316', 3);
           }
           if (ent.burning >= 1.5) {
             ent.burning = 0;
@@ -556,30 +605,33 @@ export class EntityManager {
         continue;
       }
 
-      // AI Behavior
+      // AI Behavior & Aggro Detection
       const distToPlayer = Math.hypot(playerPos.x - ent.x, playerPos.z - ent.z);
       const dyToPlayer = playerPos.y - ent.y;
+      let isChasing = false;
+      let currentChaseSpeed = 0;
 
       if (ent.type === 'zombie') {
-        if (isTargetable && distToPlayer < (isHardcore ? 20 : 16)) {
-          // Chase player
+        const aggroDist = isHardcore ? 40 : 32;
+        if (isTargetable && distToPlayer < aggroDist) {
+          isChasing = true;
           const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
           ent.yaw = angle;
-          const chaseSpeed = isHardcore ? 2.5 : 2.2;
-          ent.vx = Math.sin(angle) * chaseSpeed;
-          ent.vz = Math.cos(angle) * chaseSpeed;
+          currentChaseSpeed = isHardcore ? 3.4 : 2.8;
+          ent.vx = Math.sin(angle) * currentChaseSpeed;
+          ent.vz = Math.cos(angle) * currentChaseSpeed;
 
           // Attack player if close
-          if (distToPlayer < 1.3 && Math.abs(dyToPlayer) < 1.5) {
+          if (distToPlayer < 1.4 && Math.abs(dyToPlayer) < 1.8) {
             if (ent.attackCooldown <= 0) {
               const dmg = isHardcore ? 5 : 3;
               onPlayerDamage(dmg);
               sounds.playPlayerHurt();
-              ent.attackCooldown = isHardcore ? 0.8 : 1.0;
+              ent.attackCooldown = isHardcore ? 0.75 : 1.0;
             }
           }
         } else {
-          // Slow wander
+          // Slow idle wander
           if (Math.random() < 0.02) {
             ent.yaw += (Math.random() - 0.5) * 2;
             ent.vx = Math.sin(ent.yaw) * 0.8;
@@ -587,26 +639,31 @@ export class EntityManager {
           }
         }
       } else if (ent.type === 'skeleton') {
-        if (isTargetable && distToPlayer < (isHardcore ? 22 : 18)) {
+        const aggroDist = isHardcore ? 34 : 26;
+        if (isTargetable && distToPlayer < aggroDist) {
+          isChasing = true;
           const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
           ent.yaw = angle;
-          // Keep tactical archery distance (around 8-12 blocks) and strafe
-          if (distToPlayer < 7) {
-            ent.vx = -Math.sin(angle) * 1.8;
-            ent.vz = -Math.cos(angle) * 1.8;
-          } else if (distToPlayer > 12) {
-            ent.vx = Math.sin(angle) * 1.6;
-            ent.vz = Math.cos(angle) * 1.6;
+          currentChaseSpeed = isHardcore ? 2.8 : 2.3;
+
+          // Tactical archery positioning: maintain 8 to 14 blocks
+          if (distToPlayer < 6.5) {
+            ent.vx = -Math.sin(angle) * currentChaseSpeed;
+            ent.vz = -Math.cos(angle) * currentChaseSpeed;
+          } else if (distToPlayer > 13.5) {
+            ent.vx = Math.sin(angle) * currentChaseSpeed;
+            ent.vz = Math.cos(angle) * currentChaseSpeed;
           } else {
-            ent.vx = Math.cos(angle) * 1.2;
-            ent.vz = -Math.sin(angle) * 1.2;
+            // Circle / strafe player
+            ent.vx = Math.cos(angle) * 1.6;
+            ent.vz = -Math.sin(angle) * 1.6;
           }
 
-          if (distToPlayer < 16 && Math.abs(dyToPlayer) < 5.0) {
+          if (distToPlayer < 24 && Math.abs(dyToPlayer) < 6.0) {
             if (ent.attackCooldown <= 0) {
               sounds.playArrowShoot();
               this.spawnArrow(ent.x, ent.y + 1.2, ent.z, playerPos);
-              ent.attackCooldown = isHardcore ? 1.5 : 2.2;
+              ent.attackCooldown = isHardcore ? 1.2 : 1.8;
             }
           }
         } else {
@@ -618,35 +675,37 @@ export class EntityManager {
           }
         }
       } else if (ent.type === 'creeper') {
-        if (isTargetable && distToPlayer < (isHardcore ? 16 : 14)) {
+        const aggroDist = isHardcore ? 28 : 22;
+        if (isTargetable && distToPlayer < aggroDist) {
+          isChasing = true;
           const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
           ent.yaw = angle;
-          const chaseSpeed = isHardcore ? 2.7 : 2.4;
-          ent.vx = Math.sin(angle) * chaseSpeed;
-          ent.vz = Math.cos(angle) * chaseSpeed;
+          currentChaseSpeed = isHardcore ? 3.4 : 2.8;
+          ent.vx = Math.sin(angle) * currentChaseSpeed;
+          ent.vz = Math.cos(angle) * currentChaseSpeed;
 
-          // Fuse ticking if very close!
-          const fuseTriggerDist = isHardcore ? 3.5 : 3.0;
-          const maxFuseTime = isHardcore ? 1.0 : 1.5;
+          // Fuse ticking if within trigger range
+          const fuseTriggerDist = isHardcore ? 3.6 : 3.2;
+          const maxFuseTime = isHardcore ? 0.9 : 1.35;
 
           if (distToPlayer < fuseTriggerDist) {
             ent.fuse = (ent.fuse || 0) + dt;
-            if (ent.fuse > 0.08 && ent.fuse < 0.22) {
+            if (ent.fuse > 0.06 && ent.fuse < 0.22) {
               sounds.playCreeperHiss();
             }
 
             // Swell / pulse white
-            const scale = 1.0 + (ent.fuse / maxFuseTime) * 0.4;
+            const scale = 1.0 + (ent.fuse / maxFuseTime) * 0.45;
             mob.group.scale.set(scale, scale, scale);
 
             if (ent.fuse >= maxFuseTime) {
               // EXPLODE!
-              this.explodeAt(world, ent.x, ent.y + 0.5, ent.z, isHardcore ? 4.5 : 3.5);
+              this.explodeAt(world, ent.x, ent.y + 0.5, ent.z, isHardcore ? 4.8 : 3.8);
               this.killMob(i, world, false);
               continue;
             }
           } else {
-            ent.fuse = Math.max(0, (ent.fuse || 0) - dt * 2);
+            ent.fuse = Math.max(0, (ent.fuse || 0) - dt * 2.5);
             mob.group.scale.set(1, 1, 1);
           }
         } else {
@@ -656,6 +715,42 @@ export class EntityManager {
             ent.yaw += (Math.random() - 0.5) * 2;
             ent.vx = Math.sin(ent.yaw) * 0.7;
             ent.vz = Math.cos(ent.yaw) * 0.7;
+          }
+        }
+      } else if (ent.type === 'spider') {
+        const aggroDist = isHardcore ? 36 : 28;
+        if (isTargetable && distToPlayer < aggroDist) {
+          isChasing = true;
+          const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
+          ent.yaw = angle;
+          currentChaseSpeed = isHardcore ? 3.6 : 3.0;
+          ent.vx = Math.sin(angle) * currentChaseSpeed;
+          ent.vz = Math.cos(angle) * currentChaseSpeed;
+
+          // Spider Pounce / Leap when close!
+          if (distToPlayer < 4.5 && ent.isGrounded && ent.attackCooldown <= 0) {
+            ent.vy = 6.2;
+            ent.vx = Math.sin(angle) * (currentChaseSpeed + 2.0);
+            ent.vz = Math.cos(angle) * (currentChaseSpeed + 2.0);
+            sounds.playSwing();
+            ent.attackCooldown = 1.2;
+          }
+
+          // Bite attack
+          if (distToPlayer < 1.4 && Math.abs(dyToPlayer) < 1.6) {
+            if (ent.attackCooldown <= 0) {
+              const dmg = isHardcore ? 4 : 2;
+              onPlayerDamage(dmg);
+              sounds.playPlayerHurt();
+              ent.attackCooldown = 0.8;
+            }
+          }
+        } else {
+          // Idle skitter
+          if (Math.random() < 0.03) {
+            ent.yaw += (Math.random() - 0.5) * 2;
+            ent.vx = Math.sin(ent.yaw) * 1.0;
+            ent.vz = Math.cos(ent.yaw) * 1.0;
           }
         }
       } else {
@@ -747,7 +842,11 @@ export class EntityManager {
       ent.isGrounded = res.isGrounded;
 
       if (res.hitWall && res.isGrounded) {
-        ent.vy = 6.0;
+        ent.vy = 6.8;
+        if (isChasing) {
+          ent.vx = Math.sin(ent.yaw) * currentChaseSpeed;
+          ent.vz = Math.cos(ent.yaw) * currentChaseSpeed;
+        }
       }
 
       // Damping
@@ -772,6 +871,15 @@ export class EntityManager {
         mob.legFR.rotation.x = -legAngle;
         mob.legBL.rotation.x = -legAngle;
         mob.legBR.rotation.x = legAngle;
+      }
+
+      // Spider 8 legs crawling animation
+      if (mob.spiderLegs) {
+        const crawlTime = Date.now() * 0.015;
+        mob.spiderLegs.forEach((leg, idx) => {
+          const phase = idx % 2 === 0 ? 1 : -1;
+          leg.rotation.x = isMoving ? Math.sin(crawlTime + idx * 0.8) * 0.35 * phase : 0;
+        });
       }
 
       // Chicken Flapping Wings Animation
@@ -830,6 +938,10 @@ export class EntityManager {
     if (dropItems) {
       if (mob.entity.type === 'zombie') {
         this.spawnDroppedItem({ id: 'rotten_flesh', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+      } else if (mob.entity.type === 'skeleton') {
+        this.spawnDroppedItem({ id: 'bone', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+      } else if (mob.entity.type === 'spider') {
+        this.spawnDroppedItem({ id: 'string', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
       } else if (mob.entity.type === 'creeper') {
         this.spawnDroppedItem({ id: 'gunpowder', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
       } else if (mob.entity.type === 'pig') {
@@ -1032,6 +1144,153 @@ export class EntityManager {
 
     this.particlePoints.geometry.attributes.position.needsUpdate = true;
     this.particlePoints.geometry.attributes.color.needsUpdate = true;
+  }
+
+  public clearMobs() {
+    for (const mob of this.mobs) {
+      this.scene.remove(mob.group);
+    }
+    this.mobs = [];
+    for (const arr of this.arrows) {
+      this.scene.remove(arr.mesh);
+      arr.mesh.geometry.dispose();
+    }
+    this.arrows = [];
+  }
+
+  // Spawn initial pack suited for chosen game mode
+  public spawnInitialPack(world: VoxelWorld, spawnX: number, spawnZ: number, mode: GameMode) {
+    this.clearMobs();
+
+    // 1. Animals around spawn
+    const spawnY = world.findHighestSolidY(Math.floor(spawnX), Math.floor(spawnZ));
+    this.spawnMob('cow', spawnX + 4, spawnY + 1, spawnZ + 3);
+    this.spawnMob('sheep', spawnX - 3, spawnY + 1, spawnZ + 4);
+    this.spawnMob('pig', spawnX + 5, spawnY + 1, spawnZ - 3);
+    this.spawnMob('chicken', spawnX - 2, spawnY + 1, spawnZ - 4);
+
+    // 2. Initial hostile pack for Survival / Hardcore / Adventure
+    if (mode === 'survival' || mode === 'hardcore' || mode === 'adventure') {
+      const hostileDist = 20;
+      const z1Y = world.findHighestSolidY(Math.floor(spawnX + hostileDist), Math.floor(spawnZ + hostileDist));
+      this.spawnMob('zombie', spawnX + hostileDist, z1Y + 1, spawnZ + hostileDist);
+
+      const z2Y = world.findHighestSolidY(Math.floor(spawnX - hostileDist), Math.floor(spawnZ + 14));
+      this.spawnMob('zombie', spawnX - hostileDist, z2Y + 1, spawnZ + 14);
+
+      const skelY = world.findHighestSolidY(Math.floor(spawnX + 16), Math.floor(spawnZ - hostileDist));
+      this.spawnMob('skeleton', spawnX + 16, skelY + 1, spawnZ - hostileDist);
+
+      const creepY = world.findHighestSolidY(Math.floor(spawnX - 16), Math.floor(spawnZ - 18));
+      this.spawnMob('creeper', spawnX - 16, creepY + 1, spawnZ - 18);
+
+      const spidY = world.findHighestSolidY(Math.floor(spawnX + 22), Math.floor(spawnZ - 10));
+      this.spawnMob('spider', spawnX + 22, spidY + 1, spawnZ - 10);
+    }
+  }
+
+  private mobSpawnTimer: number = 0;
+
+  // Natural continuous mob spawning loop (called in gameLoop)
+  public updateMobSpawning(
+    world: VoxelWorld,
+    playerPos: THREE.Vector3,
+    timeOfDay: number,
+    gameMode: GameMode,
+    dt: number
+  ) {
+    this.mobSpawnTimer += dt;
+    if (this.mobSpawnTimer < 2.0) return;
+    this.mobSpawnTimer = 0;
+
+    // Despawn mobs that have moved too far away (> 52 blocks)
+    for (let i = this.mobs.length - 1; i >= 0; i--) {
+      const m = this.mobs[i];
+      const dist = Math.hypot(m.entity.x - playerPos.x, m.entity.z - playerPos.z);
+      if (dist > 52) {
+        this.scene.remove(m.group);
+        this.mobs.splice(i, 1);
+      }
+    }
+
+    if (gameMode === 'spectator') return;
+
+    // Count hostiles and peacefuls
+    let hostileCount = 0;
+    let peacefulCount = 0;
+    for (const m of this.mobs) {
+      if (['zombie', 'skeleton', 'creeper', 'spider'].includes(m.entity.type)) {
+        hostileCount++;
+      } else {
+        peacefulCount++;
+      }
+    }
+
+    const maxHostiles = gameMode === 'hardcore' ? 14 : 10;
+    const maxPeacefuls = 6;
+    const isNight = timeOfDay < 0.24 || timeOfDay > 0.76;
+    const isUnderground = playerPos.y < 26;
+
+    // 1. Spawn Hostiles (Night time or in caves/underground)
+    if ((isNight || isUnderground) && hostileCount < maxHostiles) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 18 + Math.random() * 18;
+      const sx = Math.floor(playerPos.x + Math.sin(angle) * dist);
+      const sz = Math.floor(playerPos.z + Math.cos(angle) * dist);
+
+      let sy: number;
+      if (isUnderground) {
+        sy = Math.max(2, Math.floor(playerPos.y) + Math.floor((Math.random() - 0.5) * 6));
+      } else {
+        sy = world.findHighestSolidY(sx, sz);
+      }
+
+      const groundBlock = world.getBlock(sx, sy, sz);
+      const headSpace1 = world.getBlock(sx, sy + 1, sz);
+      const headSpace2 = world.getBlock(sx, sy + 2, sz);
+
+      const isSolidGround =
+        groundBlock !== BlockType.AIR &&
+        groundBlock !== BlockType.WATER &&
+        groundBlock !== BlockType.LAVA;
+      const hasClearance =
+        (headSpace1 === BlockType.AIR || headSpace1 === BlockType.POPPY || headSpace1 === BlockType.DANDELION) &&
+        headSpace2 === BlockType.AIR;
+
+      if (isSolidGround && hasClearance) {
+        const hostilePool: ('zombie' | 'skeleton' | 'creeper' | 'spider')[] = [
+          'zombie',
+          'zombie',
+          'skeleton',
+          'creeper',
+          'spider',
+        ];
+        const chosen = hostilePool[Math.floor(Math.random() * hostilePool.length)];
+        this.spawnMob(chosen, sx + 0.5, sy + 1, sz + 0.5);
+        this.spawnParticleBurst(sx + 0.5, sy + 1.2, sz + 0.5, '#4a044e', 8);
+      }
+    }
+
+    // 2. Spawn Peaceful Animals during the day on surface Grass
+    if (!isNight && !isUnderground && peacefulCount < maxPeacefuls) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 16 + Math.random() * 18;
+      const sx = Math.floor(playerPos.x + Math.sin(angle) * dist);
+      const sz = Math.floor(playerPos.z + Math.cos(angle) * dist);
+      const sy = world.findHighestSolidY(sx, sz);
+
+      const groundBlock = world.getBlock(sx, sy, sz);
+      const headSpace = world.getBlock(sx, sy + 1, sz);
+
+      if (
+        groundBlock === BlockType.GRASS &&
+        (headSpace === BlockType.AIR || headSpace === BlockType.POPPY || headSpace === BlockType.DANDELION)
+      ) {
+        const animalPool: ('cow' | 'sheep' | 'pig' | 'chicken')[] = ['cow', 'sheep', 'pig', 'chicken'];
+        const chosen = animalPool[Math.floor(Math.random() * animalPool.length)];
+        this.spawnMob(chosen, sx + 0.5, sy + 1, sz + 0.5);
+      }
+    }
   }
 
   public dispose() {

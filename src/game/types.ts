@@ -304,7 +304,7 @@ export interface PlayerStats {
 
 export interface MobEntity {
   id: string;
-  type: 'zombie' | 'skeleton' | 'creeper' | 'pig' | 'cow' | 'sheep' | 'chicken';
+  type: 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'pig' | 'cow' | 'sheep' | 'chicken';
   x: number;
   y: number;
   z: number;

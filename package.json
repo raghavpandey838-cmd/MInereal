@@ -8,7 +8,7 @@
     "build": "vite build && node -e \"const fs = require('fs'); fs.rmSync('docs', { recursive: true, force: true }); fs.cpSync('dist', 'docs', { recursive: true }); fs.rmSync('assets', { recursive: true, force: true }); fs.cpSync('dist/assets', 'assets', { recursive: true });\"",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit",
+    "lint": "NODE_OPTIONS='--max-old-space-size=4096' tsc --noEmit",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

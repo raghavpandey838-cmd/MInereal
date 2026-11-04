@@ -25,7 +25,7 @@ interface BuildMenuModalProps {
   onSelectTool: (toolType: CreativeToolType) => void;
   onSelectCreativeItem: (itemId: ItemId) => void;
   onSpawnDriveableVehicle: (type: 'car' | 'bike' | 'boat') => void;
-  onSpawnMob: (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper' | 'chicken') => void;
+  onSpawnMob: (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'chicken') => void;
   canUndo: boolean;
   onUndo: () => void;
 }
@@ -197,7 +197,7 @@ const CREATIVE_CATEGORIES: {
 ];
 
 const MOBS_DATA: {
-  type: 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'creeper';
+  type: 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'creeper' | 'spider';
   name: string;
   desc: string;
   icon: string;
@@ -209,6 +209,7 @@ const MOBS_DATA: {
   { type: 'zombie', name: 'Night Zombie', desc: 'Undead mob roaming around. (Harmless in Creative!)', icon: '🧟' },
   { type: 'skeleton', name: 'Skeleton Archer', desc: 'Ancient bone warrior.', icon: '💀' },
   { type: 'creeper', name: 'Voxel Creeper', desc: 'Iconic green creature with ticking fuse.', icon: '💥' },
+  { type: 'spider', name: 'Cave Spider', desc: 'Eight-legged nocturnal predator with glowing red eyes.', icon: '🕷️' },
 ];
 
 export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({
