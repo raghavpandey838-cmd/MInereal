@@ -38,7 +38,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   particleQuality: 'high',
   fov: 75,
   pixelRatio: 1.25,
-  isAutoDayNight: false,
+  isAutoDayNight: true,
   weather: 'clear',
   cameraMode: 'first-person',
   masterVol: 0.8,

@@ -1951,6 +1951,64 @@ export function getItemIcon(itemId: ItemId): string {
     ctx.fillRect(6, 14, 20, 4);
     ctx.fillStyle = '#f1f5f9';
     ctx.fillRect(15, 15, 2, 2);
+  } else if (itemId === 'bow') {
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(12, 16, 11, -Math.PI * 0.42, Math.PI * 0.42);
+    ctx.stroke();
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(15, 5);
+    ctx.lineTo(15, 27);
+    ctx.stroke();
+  } else if (itemId === 'arrow') {
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(6, 26);
+    ctx.lineTo(24, 8);
+    ctx.stroke();
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(21, 5, 6, 6);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(4, 23, 5, 5);
+  } else if (itemId === 'ender_pearl') {
+    ctx.fillStyle = '#064e3b';
+    ctx.beginPath();
+    ctx.arc(16, 16, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.arc(14, 14, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#a7f3d0';
+    ctx.fillRect(11, 11, 3, 3);
+  } else if (itemId === 'eye_of_ender') {
+    ctx.fillStyle = '#065f46';
+    ctx.beginPath();
+    ctx.arc(16, 16, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#a855f7';
+    ctx.fillRect(12, 10, 8, 12);
+    ctx.fillStyle = '#1e1b4b';
+    ctx.fillRect(14, 12, 4, 8);
+  } else if (itemId === 'dragon_egg') {
+    ctx.fillStyle = '#18181b';
+    ctx.fillRect(8, 6, 16, 20);
+    ctx.fillRect(10, 4, 12, 24);
+    ctx.fillStyle = '#a855f7';
+    ctx.fillRect(10, 10, 4, 4);
+    ctx.fillRect(18, 16, 4, 4);
+    ctx.fillRect(12, 20, 4, 3);
+  } else if (itemId === 'golden_apple') {
+    ctx.fillStyle = '#eab308';
+    ctx.fillRect(7, 8, 18, 18);
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(10, 10, 5, 5);
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(15, 4, 2, 4);
   } else {
     // Default block thumbnail representation
     ctx.fillStyle = '#7a7a7a';

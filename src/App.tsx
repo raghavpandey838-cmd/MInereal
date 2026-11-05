@@ -92,6 +92,7 @@ export default function App() {
   const [compassHeading, setCompassHeading] = useState<string>('N (0°)');
   const [playerCoords, setPlayerCoords] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 30, z: 0 });
   const [mountedVehicleState, setMountedVehicleState] = useState<{ type: VehicleType; speed: number } | null>(null);
+  const [dragonHealth, setDragonHealth] = useState<{ health: number; maxHealth: number } | null>(null);
 
   // Undo / Build History Stack
   const [buildHistory, setBuildHistory] = useState<HistoryStep[][]>([]);
@@ -392,15 +393,24 @@ export default function App() {
   // Damage Player function
   const applyPlayerDamage = useCallback(
     (amount: number) => {
-      if (gameMode === 'creative' || gameMode === 'spectator' || (isFlying && gameMode !== 'hardcore' && gameMode !== 'survival' && gameMode !== 'adventure')) return;
-      sounds.playPlayerHurt();
+      if (gameMode === 'creative' || gameMode === 'spectator') return;
+
+      // Shield blocking: holding a shield in hotbar mitigates 65% of incoming damage
+      const hasShield = inventory.slice(0, 9).some((s) => s?.id === 'shield');
+      const shieldFactor = hasShield ? 0.35 : 1.0;
+      if (hasShield) {
+        sounds.playArrowHit();
+      } else {
+        sounds.playPlayerHurt();
+      }
+
       setHurtFlash(true);
       setTimeout(() => setHurtFlash(false), 250);
 
       setPlayerStats((prev) => {
         // Authentic Minecraft armor defense mitigation: each armor point mitigates 4% damage
         const defenseFactor = Math.max(0.2, 1 - prev.armor * 0.04);
-        const actualDamage = Math.max(1, Math.round(amount * defenseFactor));
+        const actualDamage = Math.max(1, Math.round(amount * defenseFactor * shieldFactor));
         const nextHealth = Math.max(0, prev.health - actualDamage);
         if (nextHealth <= 0) {
           setGameState('dead');
@@ -409,7 +419,7 @@ export default function App() {
         return { ...prev, health: nextHealth };
       });
     },
-    [gameMode, isFlying]
+    [gameMode, inventory]
   );
 
   // Consume / Eat Food
@@ -417,8 +427,11 @@ export default function App() {
     const restore = FOOD_RESTORE[foodId];
     if (!restore) return;
 
+    const bonusHeal = foodId === 'golden_apple' ? 16 : 0;
+
     setPlayerStats((prev) => ({
       ...prev,
+      health: Math.min(prev.maxHealth, prev.health + bonusHeal),
       hunger: Math.min(prev.maxHunger, prev.hunger + restore.hunger),
       saturation: Math.min(prev.hunger + restore.hunger, prev.saturation + restore.saturation),
     }));
@@ -438,6 +451,9 @@ export default function App() {
     });
 
     sounds.playEat();
+    if (foodId === 'golden_apple') {
+      sounds.playLevelUp();
+    }
   }, [selectedHotbarIndex]);
 
   // Rotate camera horizontally (for trackpad buttons or arrow keys)
@@ -730,17 +746,20 @@ export default function App() {
   };
 
   // Spawn an interactive mob in creative mode
-  const handleSpawnMob = (type: 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'creeper' | 'spider') => {
+  const handleSpawnMob = (type: 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'enderman' | 'ender_dragon') => {
     const engine = engineRef.current;
     if (!engine) return;
 
     const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion);
-    const sx = engine.playerPos.x + forwardDir.x * 3.0;
-    const sz = engine.playerPos.z + forwardDir.z * 3.0;
-    const sy = engine.world.findHighestSolidY(Math.floor(sx), Math.floor(sz)) + 1;
+    const sx = engine.playerPos.x + forwardDir.x * (type === 'ender_dragon' ? 12.0 : 3.0);
+    const sz = engine.playerPos.z + forwardDir.z * (type === 'ender_dragon' ? 12.0 : 3.0);
+    const sy =
+      type === 'ender_dragon'
+        ? Math.max(engine.playerPos.y + 10, 38)
+        : engine.world.findHighestSolidY(Math.floor(sx), Math.floor(sz)) + 1;
 
     engine.entities.spawnMob(type, sx, sy, sz);
-    engine.entities.spawnParticleBurst(sx, sy + 0.5, sz, '#ffffff', 8);
+    engine.entities.spawnParticleBurst(sx, sy + 0.5, sz, type === 'ender_dragon' ? '#d946ef' : '#ffffff', 12);
     sounds.playPop();
     unlockAdvancement('life_creator');
   };
@@ -1182,6 +1201,13 @@ export default function App() {
         else if (deg >= 247.5 && deg < 292.5) heading = 'W';
         else if (deg >= 292.5 && deg < 337.5) heading = 'NW';
         setCompassHeading(`${heading} (${Math.round(deg)}°)`);
+
+        const dragon = entities.mobs.find((m) => m.entity.type === 'ender_dragon');
+        if (dragon) {
+          setDragonHealth({ health: dragon.entity.health, maxHealth: dragon.entity.maxHealth });
+        } else if (dragonHealth !== null) {
+          setDragonHealth(null);
+        }
       }
 
       // 6. Update Hand / Tool Model
@@ -1431,21 +1457,23 @@ export default function App() {
     // 1. Check if hitting any mob first
     for (let i = 0; i < engine.entities.mobs.length; i++) {
       const mob = engine.entities.mobs[i];
+      const maxReach = mob.entity.type === 'ender_dragon' ? 7.0 : 4.8;
       const dist = Math.hypot(
         engine.playerPos.x - mob.entity.x,
         engine.playerPos.y - mob.entity.y,
         engine.playerPos.z - mob.entity.z
       );
 
-      if (dist < 4.5) {
+      if (dist < maxReach) {
+        const targetY = mob.entity.type === 'ender_dragon' ? mob.entity.y + 0.4 : mob.entity.y + 0.9;
         const toMob = new THREE.Vector3(
           mob.entity.x - engine.playerPos.x,
-          mob.entity.y + 0.8 - (engine.playerPos.y + 1.62),
+          targetY - (engine.playerPos.y + 1.62),
           mob.entity.z - engine.playerPos.z
         ).normalize();
 
         const dot = forwardDir.dot(toMob);
-        if (dot > 0.85) {
+        if (dot > 0.8) {
           const held = inventory[selectedHotbarIndex];
           let damage = (held && ITEM_ATTACK_DAMAGE[held.id]) || 4;
 
@@ -1457,7 +1485,11 @@ export default function App() {
             engine.entities.spawnParticleBurst(mob.entity.x, mob.entity.y + 0.8, mob.entity.z, '#fbbf24', 24);
           }
 
+          const willKill = mob.entity.health - damage <= 0;
           engine.entities.damageMob(i, damage, forwardDir);
+          if (willKill && ['zombie', 'skeleton', 'creeper', 'spider', 'enderman'].includes(mob.entity.type)) {
+            unlockAdvancement('monster_hunter');
+          }
           engine.isMining = false;
           return;
         }
@@ -1618,13 +1650,80 @@ export default function App() {
         }, 1800);
         return;
       }
+    }
 
-      const held = inventory[selectedHotbarIndex];
-      if (held && FOOD_RESTORE[held.id] && playerStats.hunger < 20) {
-        handleEatFood(held.id);
+    const held = inventory[selectedHotbarIndex];
+    if (held && held.id === 'bow') {
+      const arrowSlotIdx = inventory.findIndex((s) => s && s.id === 'arrow' && s.count > 0);
+      if (gameMode === 'creative' || arrowSlotIdx !== -1) {
+        sounds.playArrowShoot();
+        const shootOrigin = engine.camera.position.clone().addScaledVector(forwardDir, 0.5);
+        engine.entities.spawnPlayerArrow(shootOrigin, forwardDir);
+        if (gameMode !== 'creative' && arrowSlotIdx !== -1) {
+          setInventory((prev) => {
+            const next = [...prev];
+            const slot = next[arrowSlotIdx];
+            if (slot) {
+              next[arrowSlotIdx] = slot.count > 1 ? { ...slot, count: slot.count - 1 } : null;
+            }
+            return next;
+          });
+        }
         return;
       }
+    }
 
+    if (held && held.id === 'ender_pearl') {
+      sounds.playSwing();
+      const throwOrigin = engine.camera.position.clone().addScaledVector(forwardDir, 0.5);
+      engine.entities.throwEnderPearl(throwOrigin, forwardDir, (landPos) => {
+        if (engineRef.current) {
+          engineRef.current.playerPos.copy(landPos);
+          engineRef.current.playerVel.set(0, 0, 0);
+          if (gameMode === 'survival' || gameMode === 'hardcore') {
+            applyPlayerDamage(4);
+          }
+        }
+      });
+      if (gameMode !== 'creative') {
+        setInventory((prev) => {
+          const next = [...prev];
+          const slot = next[selectedHotbarIndex];
+          if (slot) {
+            next[selectedHotbarIndex] = slot.count > 1 ? { ...slot, count: slot.count - 1 } : null;
+          }
+          return next;
+        });
+      }
+      return;
+    }
+
+    if (held && held.id === 'eye_of_ender') {
+      sounds.playExplosion();
+      const sx = engine.playerPos.x + forwardDir.x * 14;
+      const sz = engine.playerPos.z + forwardDir.z * 14;
+      const sy = Math.max(engine.playerPos.y + 10, 38);
+      engine.entities.spawnMob('ender_dragon', sx, sy, sz);
+      engine.entities.spawnParticleBurst(sx, sy, sz, '#d946ef', 40);
+      if (gameMode !== 'creative') {
+        setInventory((prev) => {
+          const next = [...prev];
+          const slot = next[selectedHotbarIndex];
+          if (slot) {
+            next[selectedHotbarIndex] = slot.count > 1 ? { ...slot, count: slot.count - 1 } : null;
+          }
+          return next;
+        });
+      }
+      return;
+    }
+
+    if (held && FOOD_RESTORE[held.id] && (playerStats.hunger < 20 || held.id === 'golden_apple')) {
+      handleEatFood(held.id);
+      return;
+    }
+
+    if (hit.hit) {
       const placeX = hit.x + hit.normal[0];
       const placeY = hit.y + hit.normal[1];
       const placeZ = hit.z + hit.normal[2];
@@ -2132,7 +2231,20 @@ export default function App() {
     engine.playerVel.set(0, 0, 0);
 
     // Spawn mode-appropriate starter animals and perimeter hostiles
+    engine.entities.onDragonDefeated = () => {
+      unlockAdvancement('free_end');
+      setPlayerStats((prev) => ({ ...prev, level: prev.level + 5, experience: 0 }));
+    };
     engine.entities.spawnInitialPack(engine.world, safeSpawn.x, safeSpawn.z, mode);
+
+    // Enable dynamic day/night cycle and start in golden afternoon for Survival/Hardcore/Adventure
+    engine.sky.isAutoCycle = true;
+    if (mode === 'survival' || mode === 'hardcore' || mode === 'adventure') {
+      engine.sky.setTimeOfDay(0.68);
+    } else {
+      engine.sky.setTimeOfDay(0.5);
+    }
+    setGameSettings((prev) => ({ ...prev, isAutoDayNight: true }));
 
     setGameState('playing');
     engine.renderer.domElement.requestPointerLock();
@@ -2233,6 +2345,7 @@ export default function App() {
           cameraMode={gameSettings.cameraMode}
           weather={gameSettings.weather}
           timeOfDay={engineRef.current?.sky.timeOfDay ?? 0.5}
+          dragonHealth={dragonHealth}
         />
       )}
 

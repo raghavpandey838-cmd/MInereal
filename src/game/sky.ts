@@ -18,7 +18,7 @@ export class DayNightCycle {
   public cloudTexture: THREE.CanvasTexture;
   public timeOfDay: number = 0.5; // 0.0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset
   public dayDurationSec: number = 360; // 6 minute full 24-hr day/night cycle
-  public isAutoCycle: boolean = false; // Toggleable in settings
+  public isAutoCycle: boolean = true; // Toggleable in settings
   public isUnderwater: boolean = false;
 
   constructor(scene: THREE.Scene) {

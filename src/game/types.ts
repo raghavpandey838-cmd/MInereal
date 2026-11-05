@@ -265,7 +265,13 @@ export type ItemId =
   | 'cooked_chicken'
   | 'egg'
   | 'seeds'
-  | 'carrot';
+  | 'carrot'
+  | 'bow'
+  | 'arrow'
+  | 'ender_pearl'
+  | 'eye_of_ender'
+  | 'dragon_egg'
+  | 'golden_apple';
 
 export interface ItemStack {
   id: ItemId;
@@ -304,7 +310,7 @@ export interface PlayerStats {
 
 export interface MobEntity {
   id: string;
-  type: 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'pig' | 'cow' | 'sheep' | 'chicken';
+  type: 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'enderman' | 'ender_dragon' | 'pig' | 'cow' | 'sheep' | 'chicken';
   x: number;
   y: number;
   z: number;
@@ -322,6 +328,7 @@ export interface MobEntity {
   burning?: number; // daylight burn for zombies
   fleeTimer?: number;
   grazeTimer?: number;
+  provoked?: boolean; // for enderman
 }
 
 export interface DroppedItemEntity {

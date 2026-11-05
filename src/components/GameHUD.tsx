@@ -49,6 +49,7 @@ interface GameHUDProps {
   cameraMode?: 'first-person' | 'third-person-back' | 'third-person-front';
   weather?: string;
   timeOfDay?: number;
+  dragonHealth?: { health: number; maxHealth: number } | null;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -92,6 +93,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   cameraMode = 'first-person',
   weather = 'clear',
   timeOfDay = 0.5,
+  dragonHealth = null,
 }) => {
   const [guiScale, setGuiScale] = useState<'compact' | 'normal'>('compact');
   const selectedItem = hotbar[selectedIndex] || null;
@@ -124,6 +126,22 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           <div className="bg-purple-950/90 border border-purple-400 text-purple-200 px-3.5 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-xl backdrop-blur-xs flex items-center gap-1.5 animate-pulse">
             <span>👁️</span>
             <span>Spectator Mode · Noclip Flight Active</span>
+          </div>
+        </div>
+      )}
+
+      {/* Ender Dragon Boss Health Bar */}
+      {dragonHealth && (
+        <div className="absolute top-11 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center w-72 sm:w-96">
+          <div className="text-xs sm:text-sm font-bold text-purple-200 drop-shadow-[1px_1px_0px_#000] mb-1 tracking-wide flex items-center gap-1.5">
+            <span>🐉</span>
+            <span>Ender Dragon</span>
+          </div>
+          <div className="w-full h-2.5 bg-black/80 border border-purple-500/80 rounded-full overflow-hidden shadow-lg">
+            <div
+              className="h-full bg-gradient-to-r from-purple-700 via-fuchsia-500 to-purple-400 transition-all duration-150"
+              style={{ width: `${Math.max(0, Math.min(100, (dragonHealth.health / dragonHealth.maxHealth) * 100))}%` }}
+            />
           </div>
         </div>
       )}

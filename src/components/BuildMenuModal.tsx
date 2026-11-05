@@ -25,7 +25,7 @@ interface BuildMenuModalProps {
   onSelectTool: (toolType: CreativeToolType) => void;
   onSelectCreativeItem: (itemId: ItemId) => void;
   onSpawnDriveableVehicle: (type: 'car' | 'bike' | 'boat') => void;
-  onSpawnMob: (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'chicken') => void;
+  onSpawnMob: (type: 'pig' | 'cow' | 'sheep' | 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'enderman' | 'ender_dragon' | 'chicken') => void;
   canUndo: boolean;
   onUndo: () => void;
 }
@@ -197,7 +197,7 @@ const CREATIVE_CATEGORIES: {
 ];
 
 const MOBS_DATA: {
-  type: 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'creeper' | 'spider';
+  type: 'pig' | 'cow' | 'sheep' | 'chicken' | 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'enderman' | 'ender_dragon';
   name: string;
   desc: string;
   icon: string;
@@ -210,6 +210,8 @@ const MOBS_DATA: {
   { type: 'skeleton', name: 'Skeleton Archer', desc: 'Ancient bone warrior.', icon: '💀' },
   { type: 'creeper', name: 'Voxel Creeper', desc: 'Iconic green creature with ticking fuse.', icon: '💥' },
   { type: 'spider', name: 'Cave Spider', desc: 'Eight-legged nocturnal predator with glowing red eyes.', icon: '🕷️' },
+  { type: 'enderman', name: 'Enderman', desc: 'Tall teleporting shadow creature with glowing purple eyes.', icon: '👾' },
+  { type: 'ender_dragon', name: 'Ender Dragon Boss', desc: 'Mighty winged boss of The End! (200 HP)', icon: '🐉' },
 ];
 
 export const BuildMenuModal: React.FC<BuildMenuModalProps> = ({

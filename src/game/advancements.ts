@@ -111,4 +111,20 @@ export const INITIAL_ADVANCEMENTS: Advancement[] = [
     category: 'exploration',
     unlocked: false,
   },
+  {
+    id: 'monster_hunter',
+    title: 'Monster Hunter',
+    description: 'Attack and defeat a hostile creature in combat.',
+    icon: '⚔️',
+    category: 'story',
+    unlocked: false,
+  },
+  {
+    id: 'free_end',
+    title: 'Free the End',
+    description: 'Summon and defeat the mighty Ender Dragon!',
+    icon: '🐉',
+    category: 'story',
+    unlocked: false,
+  },
 ];

@@ -974,6 +974,7 @@ export const ITEM_MAX_DURABILITY: Partial<Record<ItemId, number>> = {
   diamond_axe: 1562,
   diamond_sword: 1562,
   diamond_shovel: 1562,
+  bow: 384,
 };
 
 export const ITEM_ATTACK_DAMAGE: Partial<Record<ItemId, number>> = {
@@ -993,6 +994,7 @@ export const ITEM_ATTACK_DAMAGE: Partial<Record<ItemId, number>> = {
 
 export const FOOD_RESTORE: Partial<Record<ItemId, { hunger: number; saturation: number }>> = {
   apple: { hunger: 4, saturation: 2.4 },
+  golden_apple: { hunger: 8, saturation: 9.6 },
   bread: { hunger: 5, saturation: 6.0 },
   raw_porkchop: { hunger: 3, saturation: 1.8 },
   cooked_porkchop: { hunger: 8, saturation: 12.8 },

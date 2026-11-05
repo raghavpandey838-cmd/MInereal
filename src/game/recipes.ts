@@ -298,6 +298,46 @@ export const CRAFTING_RECIPES: CraftingRecipe[] = [
     ],
     result: { id: 'shield', count: 1, durability: 336, maxDurability: 336 },
   },
+  // Bow
+  {
+    name: 'Bow',
+    gridSize: 3,
+    pattern: [
+      null, 'stick', 'string',
+      'stick', null, 'string',
+      null, 'stick', 'string',
+    ],
+    result: { id: 'bow', count: 1, durability: 384, maxDurability: 384 },
+  },
+  // Arrows (4x)
+  {
+    name: 'Arrows (x4)',
+    gridSize: 3,
+    pattern: [
+      null, 'cobblestone', null,
+      null, 'stick', null,
+      null, 'feather', null,
+    ],
+    result: { id: 'arrow', count: 4 },
+  },
+  // Golden Apple
+  {
+    name: 'Golden Apple',
+    gridSize: 3,
+    pattern: [
+      'gold_ingot', 'gold_ingot', 'gold_ingot',
+      'gold_ingot', 'apple', 'gold_ingot',
+      'gold_ingot', 'gold_ingot', 'gold_ingot',
+    ],
+    result: { id: 'golden_apple', count: 1 },
+  },
+  // Eye of Ender (2x2)
+  {
+    name: 'Eye of Ender',
+    gridSize: 2,
+    pattern: ['ender_pearl', 'gold_ingot', null, null],
+    result: { id: 'eye_of_ender', count: 1 },
+  },
 ];
 
 export function findMatchingRecipe(grid: (ItemStack | null)[], size: 2 | 3): ItemStack | null {

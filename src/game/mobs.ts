@@ -34,7 +34,10 @@ export class EntityManager {
   public particles: ParticleEffect[] = [];
   public particlePoints: THREE.Points | null = null;
   public primedTntList: { x: number; y: number; z: number; mesh: THREE.Mesh; fuse: number }[] = [];
-  public arrows: { pos: THREE.Vector3; vel: THREE.Vector3; mesh: THREE.Mesh; life: number }[] = [];
+  public arrows: { pos: THREE.Vector3; vel: THREE.Vector3; mesh: THREE.Mesh; life: number; isDragonFireball?: boolean }[] = [];
+  public playerArrows: { pos: THREE.Vector3; vel: THREE.Vector3; mesh: THREE.Mesh; life: number }[] = [];
+  public thrownPearls: { pos: THREE.Vector3; vel: THREE.Vector3; mesh: THREE.Mesh; life: number; onTeleport: (pos: THREE.Vector3) => void }[] = [];
+  public onDragonDefeated?: () => void;
   public scene: THREE.Scene;
 
   constructor(scene: THREE.Scene) {
@@ -65,7 +68,7 @@ export class EntityManager {
 
   // Spawn a mob
   public spawnMob(
-    type: 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'pig' | 'cow' | 'sheep' | 'chicken',
+    type: 'zombie' | 'skeleton' | 'creeper' | 'spider' | 'enderman' | 'ender_dragon' | 'pig' | 'cow' | 'sheep' | 'chicken',
     x: number,
     y: number,
     z: number
@@ -417,6 +420,87 @@ export class EntityManager {
         group.add(leg);
         spiderLegs.push(leg);
       }
+    } else if (type === 'enderman') {
+      // Enderman (Tall 2.9-block black figure with glowing purple eyes and long limbs)
+      maxHealth = 40;
+      const enderMat = new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.7 });
+      head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), enderMat);
+      head.position.set(0, 2.55, 0);
+      group.add(head);
+
+      // Glowing purple Enderman eyes
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xd946ef });
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.02), eyeMat);
+      eyeL.position.set(-0.14, 2.55, 0.26);
+      group.add(eyeL);
+      const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.02), eyeMat);
+      eyeR.position.set(0.14, 2.55, 0.26);
+      group.add(eyeR);
+
+      body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 0.25), enderMat);
+      body.position.set(0, 1.85, 0);
+      group.add(body);
+
+      leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.5, 0.14), enderMat);
+      leftArm.position.set(-0.35, 1.55, 0);
+      group.add(leftArm);
+
+      rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.5, 0.14), enderMat);
+      rightArm.position.set(0.35, 1.55, 0);
+      group.add(rightArm);
+
+      leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.4, 0.14), enderMat);
+      leftLeg.position.set(-0.14, 0.7, 0);
+      group.add(leftLeg);
+
+      rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.4, 0.14), enderMat);
+      rightLeg.position.set(0.14, 0.7, 0);
+      group.add(rightLeg);
+    } else if (type === 'ender_dragon') {
+      // Ender Dragon Boss (Massive articulated black & purple dragon with flapping wings)
+      maxHealth = 200;
+      const dragonMat = new THREE.MeshStandardMaterial({ color: 0x141418, roughness: 0.6, metalness: 0.2 });
+      const scaleMat = new THREE.MeshStandardMaterial({ color: 0x2e1065, roughness: 0.5 });
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xe879f9 });
+
+      // Dragon Head & Snout
+      head = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.9, 1.4), dragonMat);
+      head.position.set(0, 0.4, 2.6);
+      group.add(head);
+
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.55, 0.9), dragonMat);
+      snout.position.set(0, 0.25, 3.6);
+      group.add(snout);
+
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.05), eyeMat);
+      eyeL.position.set(-0.42, 0.55, 3.31);
+      group.add(eyeL);
+      const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.05), eyeMat);
+      eyeR.position.set(0.42, 0.55, 3.31);
+      group.add(eyeR);
+
+      // Dragon Torso & Spine
+      body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 3.6), dragonMat);
+      body.position.set(0, 0.2, 0);
+      group.add(body);
+
+      const spine = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.45, 3.2), scaleMat);
+      spine.position.set(0, 1.0, 0);
+      group.add(spine);
+
+      // Dragon Tail
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 3.4), dragonMat);
+      tail.position.set(0, 0.15, -3.3);
+      group.add(tail);
+
+      // Massive Flapping Wings (using wingL & wingR)
+      wingL = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.12, 2.2), scaleMat);
+      wingL.position.set(-2.9, 0.6, 0.2);
+      group.add(wingL);
+
+      wingR = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.12, 2.2), scaleMat);
+      wingR.position.set(2.9, 0.6, 0.2);
+      group.add(wingR);
     } else {
       head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x477839 }));
       body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.75, 0.25), new THREE.MeshStandardMaterial({ color: 0x247596 }));
@@ -464,19 +548,29 @@ export class EntityManager {
     return mobVisual;
   }
 
-  // Spawn an arrow projectile
-  public spawnArrow(fromX: number, fromY: number, fromZ: number, targetPos: THREE.Vector3) {
-    const arrowGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.65, 5);
-    arrowGeom.rotateX(Math.PI / 2);
-    const arrowMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5 });
+  // Spawn an arrow or dragon fireball projectile
+  public spawnArrow(fromX: number, fromY: number, fromZ: number, targetPos: THREE.Vector3, isDragonFireball: boolean = false) {
+    const arrowGeom = isDragonFireball
+      ? new THREE.SphereGeometry(0.28, 8, 8)
+      : new THREE.CylinderGeometry(0.025, 0.025, 0.65, 5);
+    if (!isDragonFireball) {
+      arrowGeom.rotateX(Math.PI / 2);
+    }
+    const arrowMat = new THREE.MeshStandardMaterial({
+      color: isDragonFireball ? 0xd946ef : 0x94a3b8,
+      emissive: isDragonFireball ? 0xa855f7 : 0x000000,
+      roughness: 0.4,
+    });
     const arrowMesh = new THREE.Mesh(arrowGeom, arrowMat);
     arrowMesh.position.set(fromX, fromY, fromZ);
 
     const dir = new THREE.Vector3().subVectors(targetPos, new THREE.Vector3(fromX, fromY, fromZ)).normalize();
-    dir.y += 0.12; // arc compensation
-    dir.normalize();
+    if (!isDragonFireball) {
+      dir.y += 0.12; // arc compensation
+      dir.normalize();
+    }
 
-    const speed = 19.0;
+    const speed = isDragonFireball ? 16.0 : 19.0;
     const vel = dir.multiplyScalar(speed);
     arrowMesh.lookAt(targetPos);
 
@@ -486,10 +580,53 @@ export class EntityManager {
       vel,
       mesh: arrowMesh,
       life: 0,
+      isDragonFireball,
     });
   }
 
-  // Update flying arrows
+  // Player shoots an arrow with a Bow
+  public spawnPlayerArrow(fromPos: THREE.Vector3, lookDir: THREE.Vector3) {
+    const arrowGeom = new THREE.CylinderGeometry(0.03, 0.03, 0.75, 5);
+    arrowGeom.rotateX(Math.PI / 2);
+    const arrowMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.4 });
+    const arrowMesh = new THREE.Mesh(arrowGeom, arrowMat);
+    arrowMesh.position.copy(fromPos);
+
+    const vel = lookDir.clone().normalize().multiplyScalar(28.0);
+    arrowMesh.lookAt(fromPos.clone().add(vel));
+
+    this.scene.add(arrowMesh);
+    this.playerArrows.push({
+      pos: fromPos.clone(),
+      vel,
+      mesh: arrowMesh,
+      life: 0,
+    });
+  }
+
+  // Player throws an Ender Pearl
+  public throwEnderPearl(fromPos: THREE.Vector3, lookDir: THREE.Vector3, onTeleport: (pos: THREE.Vector3) => void) {
+    const pearlGeom = new THREE.SphereGeometry(0.16, 10, 10);
+    const pearlMat = new THREE.MeshStandardMaterial({
+      color: 0x10b981,
+      emissive: 0x059669,
+      roughness: 0.3,
+    });
+    const pearlMesh = new THREE.Mesh(pearlGeom, pearlMat);
+    pearlMesh.position.copy(fromPos);
+
+    const vel = lookDir.clone().normalize().multiplyScalar(22.0);
+    this.scene.add(pearlMesh);
+    this.thrownPearls.push({
+      pos: fromPos.clone(),
+      vel,
+      mesh: pearlMesh,
+      life: 0,
+      onTeleport,
+    });
+  }
+
+  // Update flying arrows & dragon fireballs
   public updateArrows(dt: number, world: VoxelWorld, playerPos: THREE.Vector3, onPlayerDamage: (amt: number) => void) {
     for (let i = this.arrows.length - 1; i >= 0; i--) {
       const arr = this.arrows[i];
@@ -501,17 +638,27 @@ export class EntityManager {
         continue;
       }
 
-      arr.vel.y -= 9.8 * dt; // gravity arc
+      if (!arr.isDragonFireball) {
+        arr.vel.y -= 9.8 * dt; // gravity arc
+      } else if (Math.random() < 0.4) {
+        this.spawnParticleBurst(arr.pos.x, arr.pos.y, arr.pos.z, '#d946ef', 1);
+      }
       arr.pos.addScaledVector(arr.vel, dt);
       arr.mesh.position.copy(arr.pos);
       arr.mesh.lookAt(arr.pos.clone().add(arr.vel));
 
       // Hit player check
       const dist = arr.pos.distanceTo(new THREE.Vector3(playerPos.x, playerPos.y + 0.9, playerPos.z));
-      if (dist < 0.85) {
+      if (dist < (arr.isDragonFireball ? 1.35 : 0.85)) {
         sounds.playArrowHit();
-        onPlayerDamage(3);
-        this.spawnParticleBurst(arr.pos.x, arr.pos.y, arr.pos.z, '#ef4444', 6);
+        onPlayerDamage(arr.isDragonFireball ? 6 : 3);
+        this.spawnParticleBurst(
+          arr.pos.x,
+          arr.pos.y,
+          arr.pos.z,
+          arr.isDragonFireball ? '#d946ef' : '#ef4444',
+          arr.isDragonFireball ? 16 : 6
+        );
         this.scene.remove(arr.mesh);
         arr.mesh.geometry.dispose();
         this.arrows.splice(i, 1);
@@ -524,9 +671,95 @@ export class EntityManager {
       const bz = Math.floor(arr.pos.z);
       if (world.getBlock(bx, by, bz) !== BlockType.AIR && world.getBlock(bx, by, bz) !== BlockType.WATER) {
         sounds.playArrowHit();
+        if (arr.isDragonFireball) {
+          this.spawnParticleBurst(arr.pos.x, arr.pos.y + 0.3, arr.pos.z, '#d946ef', 18);
+        }
         this.scene.remove(arr.mesh);
         arr.mesh.geometry.dispose();
         this.arrows.splice(i, 1);
+      }
+    }
+
+    // Update Player Bow Arrows
+    for (let i = this.playerArrows.length - 1; i >= 0; i--) {
+      const arr = this.playerArrows[i];
+      arr.life += dt;
+      if (arr.life > 4.5) {
+        this.scene.remove(arr.mesh);
+        arr.mesh.geometry.dispose();
+        this.playerArrows.splice(i, 1);
+        continue;
+      }
+
+      arr.vel.y -= 9.8 * dt;
+      arr.pos.addScaledVector(arr.vel, dt);
+      arr.mesh.position.copy(arr.pos);
+      arr.mesh.lookAt(arr.pos.clone().add(arr.vel));
+
+      // Check hit against all mobs
+      let hitMob = false;
+      for (let mIdx = 0; mIdx < this.mobs.length; mIdx++) {
+        const mob = this.mobs[mIdx];
+        const hitRadius = mob.entity.type === 'ender_dragon' ? 3.2 : 1.05;
+        const centerY = mob.entity.type === 'ender_dragon' ? mob.entity.y + 0.4 : mob.entity.y + 1.0;
+        const d = arr.pos.distanceTo(new THREE.Vector3(mob.entity.x, centerY, mob.entity.z));
+        if (d < hitRadius) {
+          const kb = arr.vel.clone().normalize();
+          this.damageMob(mIdx, 9, kb);
+          sounds.playArrowHit();
+          hitMob = true;
+          break;
+        }
+      }
+
+      if (hitMob) {
+        this.scene.remove(arr.mesh);
+        arr.mesh.geometry.dispose();
+        this.playerArrows.splice(i, 1);
+        continue;
+      }
+
+      const bx = Math.floor(arr.pos.x);
+      const by = Math.floor(arr.pos.y);
+      const bz = Math.floor(arr.pos.z);
+      if (world.getBlock(bx, by, bz) !== BlockType.AIR && world.getBlock(bx, by, bz) !== BlockType.WATER) {
+        sounds.playArrowHit();
+        this.scene.remove(arr.mesh);
+        arr.mesh.geometry.dispose();
+        this.playerArrows.splice(i, 1);
+      }
+    }
+
+    // Update Thrown Ender Pearls
+    for (let i = this.thrownPearls.length - 1; i >= 0; i--) {
+      const pearl = this.thrownPearls[i];
+      pearl.life += dt;
+      if (pearl.life > 5.0) {
+        this.scene.remove(pearl.mesh);
+        pearl.mesh.geometry.dispose();
+        this.thrownPearls.splice(i, 1);
+        continue;
+      }
+
+      pearl.vel.y -= 12.0 * dt;
+      pearl.pos.addScaledVector(pearl.vel, dt);
+      pearl.mesh.position.copy(pearl.pos);
+      if (Math.random() < 0.5) {
+        this.spawnParticleBurst(pearl.pos.x, pearl.pos.y, pearl.pos.z, '#a855f7', 2);
+      }
+
+      const bx = Math.floor(pearl.pos.x);
+      const by = Math.floor(pearl.pos.y);
+      const bz = Math.floor(pearl.pos.z);
+      const hitBlock = world.getBlock(bx, by, bz);
+      if (hitBlock !== BlockType.AIR && hitBlock !== BlockType.WATER) {
+        const landPos = new THREE.Vector3(pearl.pos.x, by + 1.05, pearl.pos.z);
+        this.spawnParticleBurst(landPos.x, landPos.y + 0.8, landPos.z, '#d946ef', 25);
+        sounds.playLevelUp();
+        pearl.onTeleport(landPos);
+        this.scene.remove(pearl.mesh);
+        pearl.mesh.geometry.dispose();
+        this.thrownPearls.splice(i, 1);
       }
     }
   }
@@ -546,7 +779,7 @@ export class EntityManager {
     const isTargetable = gameMode !== 'creative' && gameMode !== 'spectator';
     const isHardcore = gameMode === 'hardcore';
 
-    // Update arrows
+    // Update arrows & pearls
     this.updateArrows(dt, world, playerPos, onPlayerDamage);
 
     for (let i = this.mobs.length - 1; i >= 0; i--) {
@@ -753,6 +986,68 @@ export class EntityManager {
             ent.vz = Math.cos(ent.yaw) * 1.0;
           }
         }
+      } else if (ent.type === 'enderman') {
+        const aggroDist = isHardcore ? 36 : 28;
+        if (isTargetable && distToPlayer < aggroDist && (ent.provoked || ent.health < ent.maxHealth || distToPlayer < 8)) {
+          ent.provoked = true;
+          isChasing = true;
+          const angle = Math.atan2(playerPos.x - ent.x, playerPos.z - ent.z);
+          ent.yaw = angle;
+          currentChaseSpeed = isHardcore ? 4.4 : 3.8;
+          ent.vx = Math.sin(angle) * currentChaseSpeed;
+          ent.vz = Math.cos(angle) * currentChaseSpeed;
+
+          // Teleport behind/near player periodically when chasing!
+          if (distToPlayer > 10 && Math.random() < 0.025) {
+            const tpAngle = angle + (Math.random() - 0.5) * 1.6;
+            const tpX = ent.x + Math.sin(tpAngle) * 6;
+            const tpZ = ent.z + Math.cos(tpAngle) * 6;
+            const tpY = world.findHighestSolidY(Math.floor(tpX), Math.floor(tpZ)) + 1;
+            this.spawnParticleBurst(ent.x, ent.y + 1.5, ent.z, '#d946ef', 14);
+            ent.x = tpX;
+            ent.y = tpY;
+            ent.z = tpZ;
+            this.spawnParticleBurst(ent.x, ent.y + 1.5, ent.z, '#d946ef', 14);
+            sounds.playSwing();
+          }
+
+          if (distToPlayer < 1.6 && Math.abs(dyToPlayer) < 2.2) {
+            if (ent.attackCooldown <= 0) {
+              const dmg = isHardcore ? 7 : 5;
+              onPlayerDamage(dmg);
+              sounds.playPlayerHurt();
+              ent.attackCooldown = 0.9;
+            }
+          }
+        } else {
+          if (Math.random() < 0.015) {
+            ent.yaw += (Math.random() - 0.5) * 2;
+            ent.vx = Math.sin(ent.yaw) * 0.9;
+            ent.vz = Math.cos(ent.yaw) * 0.9;
+          }
+        }
+      } else if (ent.type === 'ender_dragon') {
+        // Ender Dragon Boss Aerial AI!
+        const orbitTime = Date.now() * 0.0007;
+        const orbitRadius = 18;
+        const targetX = playerPos.x + Math.cos(orbitTime) * orbitRadius;
+        const targetZ = playerPos.z + Math.sin(orbitTime) * orbitRadius;
+        const targetY = Math.max(playerPos.y + 9, 36) + Math.sin(orbitTime * 2.3) * 3.5;
+
+        const dx = targetX - ent.x;
+        const dy = targetY - ent.y;
+        const dz = targetZ - ent.z;
+        ent.yaw = Math.atan2(dx, dz);
+        ent.vx = dx * 1.4;
+        ent.vy = dy * 1.8;
+        ent.vz = dz * 1.4;
+
+        // Fire purple Dragon Fireballs at player!
+        if (isTargetable && distToPlayer < 48 && ent.attackCooldown <= 0) {
+          sounds.playExplosion();
+          this.spawnArrow(ent.x, ent.y, ent.z, new THREE.Vector3(playerPos.x, playerPos.y + 1.0, playerPos.z), true);
+          ent.attackCooldown = isHardcore ? 1.8 : 2.6;
+        }
       } else {
         // Peaceful animals (Pig, Cow, Sheep, Chicken)
         const isAnimalFood =
@@ -824,34 +1119,44 @@ export class EntityManager {
         ent.attackCooldown -= dt;
       }
 
-      // Physics integration
-      ent.vy -= PhysicsEngine.GRAVITY * dt;
-      if (ent.vy < -PhysicsEngine.TERMINAL_VELOCITY) {
-        ent.vy = -PhysicsEngine.TERMINAL_VELOCITY;
-      }
+      // Physics integration (Ender Dragon flies freely without gravity)
+      if (ent.type === 'ender_dragon') {
+        ent.x += ent.vx * dt;
+        ent.y += ent.vy * dt;
+        ent.z += ent.vz * dt;
+      } else {
+        if (inWater) {
+          // Swim upward in water so mobs never sink/drown
+          ent.vy = Math.max(ent.vy, 3.6);
+        } else {
+          ent.vy -= PhysicsEngine.GRAVITY * dt;
+          if (ent.vy < -PhysicsEngine.TERMINAL_VELOCITY) {
+            ent.vy = -PhysicsEngine.TERMINAL_VELOCITY;
+          }
+        }
 
-      mobPos.set(ent.x, ent.y, ent.z);
-      mobVel.set(ent.vx, ent.vy, ent.vz);
+        mobPos.set(ent.x, ent.y, ent.z);
+        mobVel.set(ent.vx, ent.vy, ent.vz);
 
-      // Auto jump when hitting wall
-      const res = PhysicsEngine.moveEntity(world, mobPos, mobVel, 0.3, 1.8, dt, true);
-      ent.x = mobPos.x;
-      ent.y = mobPos.y;
-      ent.z = mobPos.z;
-      ent.vy = mobVel.y;
-      ent.isGrounded = res.isGrounded;
+        // Auto jump when hitting wall or exiting water
+        const res = PhysicsEngine.moveEntity(world, mobPos, mobVel, 0.3, 1.8, dt, true);
+        ent.x = mobPos.x;
+        ent.y = mobPos.y;
+        ent.z = mobPos.z;
+        ent.vy = mobVel.y;
+        ent.isGrounded = res.isGrounded;
 
-      if (res.hitWall && res.isGrounded) {
-        ent.vy = 6.8;
+        if (res.hitWall && (res.isGrounded || inWater)) {
+          ent.vy = 7.4;
+        }
         if (isChasing) {
           ent.vx = Math.sin(ent.yaw) * currentChaseSpeed;
           ent.vz = Math.cos(ent.yaw) * currentChaseSpeed;
+        } else {
+          ent.vx *= 0.85;
+          ent.vz *= 0.85;
         }
       }
-
-      // Damping
-      ent.vx *= 0.85;
-      ent.vz *= 0.85;
 
       // Sync 3D Mesh
       mob.group.position.set(ent.x, ent.y, ent.z);
@@ -940,10 +1245,18 @@ export class EntityManager {
         this.spawnDroppedItem({ id: 'rotten_flesh', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
       } else if (mob.entity.type === 'skeleton') {
         this.spawnDroppedItem({ id: 'bone', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+        this.spawnDroppedItem({ id: 'arrow', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
       } else if (mob.entity.type === 'spider') {
         this.spawnDroppedItem({ id: 'string', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
       } else if (mob.entity.type === 'creeper') {
         this.spawnDroppedItem({ id: 'gunpowder', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+      } else if (mob.entity.type === 'enderman') {
+        this.spawnDroppedItem({ id: 'ender_pearl', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+      } else if (mob.entity.type === 'ender_dragon') {
+        this.spawnDroppedItem({ id: 'dragon_egg', count: 1 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
+        this.spawnParticleBurst(mob.entity.x, mob.entity.y + 1, mob.entity.z, '#d946ef', 45);
+        sounds.playLevelUp();
+        this.onDragonDefeated?.();
       } else if (mob.entity.type === 'pig') {
         this.spawnDroppedItem({ id: 'raw_porkchop', count: 2 }, mob.entity.x, mob.entity.y + 0.5, mob.entity.z);
       } else if (mob.entity.type === 'cow') {
@@ -1156,6 +1469,42 @@ export class EntityManager {
       arr.mesh.geometry.dispose();
     }
     this.arrows = [];
+    for (const arr of this.playerArrows) {
+      this.scene.remove(arr.mesh);
+      arr.mesh.geometry.dispose();
+    }
+    this.playerArrows = [];
+    for (const p of this.thrownPearls) {
+      this.scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+    }
+    this.thrownPearls = [];
+  }
+
+  private findDryLandNear(world: VoxelWorld, targetX: number, targetZ: number): { x: number; y: number; z: number } | null {
+    for (let r = 0; r <= 10; r += 2) {
+      for (let dx = -r; dx <= r; dx += 2) {
+        for (let dz = -r; dz <= r; dz += 2) {
+          const wx = Math.floor(targetX + dx);
+          const wz = Math.floor(targetZ + dz);
+          const wy = world.findHighestSolidY(wx, wz);
+          const ground = world.getBlock(wx, wy, wz);
+          const above1 = world.getBlock(wx, wy + 1, wz);
+          const above2 = world.getBlock(wx, wy + 2, wz);
+          if (
+            wy > 24 &&
+            ground !== BlockType.AIR &&
+            ground !== BlockType.WATER &&
+            ground !== BlockType.LAVA &&
+            above1 === BlockType.AIR &&
+            above2 === BlockType.AIR
+          ) {
+            return { x: wx + 0.5, y: wy + 1, z: wz + 0.5 };
+          }
+        }
+      }
+    }
+    return null;
   }
 
   // Spawn initial pack suited for chosen game mode
@@ -1169,23 +1518,22 @@ export class EntityManager {
     this.spawnMob('pig', spawnX + 5, spawnY + 1, spawnZ - 3);
     this.spawnMob('chicken', spawnX - 2, spawnY + 1, spawnZ - 4);
 
-    // 2. Initial hostile pack for Survival / Hardcore / Adventure
+    // 2. Initial hostile pack for Survival / Hardcore / Adventure on guaranteed dry land
     if (mode === 'survival' || mode === 'hardcore' || mode === 'adventure') {
-      const hostileDist = 20;
-      const z1Y = world.findHighestSolidY(Math.floor(spawnX + hostileDist), Math.floor(spawnZ + hostileDist));
-      this.spawnMob('zombie', spawnX + hostileDist, z1Y + 1, spawnZ + hostileDist);
-
-      const z2Y = world.findHighestSolidY(Math.floor(spawnX - hostileDist), Math.floor(spawnZ + 14));
-      this.spawnMob('zombie', spawnX - hostileDist, z2Y + 1, spawnZ + 14);
-
-      const skelY = world.findHighestSolidY(Math.floor(spawnX + 16), Math.floor(spawnZ - hostileDist));
-      this.spawnMob('skeleton', spawnX + 16, skelY + 1, spawnZ - hostileDist);
-
-      const creepY = world.findHighestSolidY(Math.floor(spawnX - 16), Math.floor(spawnZ - 18));
-      this.spawnMob('creeper', spawnX - 16, creepY + 1, spawnZ - 18);
-
-      const spidY = world.findHighestSolidY(Math.floor(spawnX + 22), Math.floor(spawnZ - 10));
-      this.spawnMob('spider', spawnX + 22, spidY + 1, spawnZ - 10);
+      const offsets: { type: 'creeper' | 'spider' | 'zombie' | 'skeleton'; dx: number; dz: number }[] = [
+        { type: 'creeper', dx: 15, dz: 12 },
+        { type: 'spider', dx: -16, dz: 10 },
+        { type: 'creeper', dx: -14, dz: -15 },
+        { type: 'spider', dx: 17, dz: -14 },
+        { type: 'zombie', dx: 18, dz: 4 },
+        { type: 'skeleton', dx: -18, dz: -4 },
+      ];
+      for (const item of offsets) {
+        const spot = this.findDryLandNear(world, spawnX + item.dx, spawnZ + item.dz);
+        if (spot) {
+          this.spawnMob(item.type, spot.x, spot.y, spot.z);
+        }
+      }
     }
   }
 
@@ -1203,11 +1551,12 @@ export class EntityManager {
     if (this.mobSpawnTimer < 2.0) return;
     this.mobSpawnTimer = 0;
 
-    // Despawn mobs that have moved too far away (> 52 blocks)
+    // Despawn mobs that have moved too far away (> 56 blocks), except Ender Dragon
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const m = this.mobs[i];
+      if (m.entity.type === 'ender_dragon') continue;
       const dist = Math.hypot(m.entity.x - playerPos.x, m.entity.z - playerPos.z);
-      if (dist > 52) {
+      if (dist > 56) {
         this.scene.remove(m.group);
         this.mobs.splice(i, 1);
       }
@@ -1219,22 +1568,32 @@ export class EntityManager {
     let hostileCount = 0;
     let peacefulCount = 0;
     for (const m of this.mobs) {
-      if (['zombie', 'skeleton', 'creeper', 'spider'].includes(m.entity.type)) {
+      if (['zombie', 'skeleton', 'creeper', 'spider', 'enderman'].includes(m.entity.type)) {
         hostileCount++;
-      } else {
+      } else if (m.entity.type !== 'ender_dragon') {
         peacefulCount++;
       }
     }
 
-    const maxHostiles = gameMode === 'hardcore' ? 14 : 10;
-    const maxPeacefuls = 6;
-    const isNight = timeOfDay < 0.24 || timeOfDay > 0.76;
+    const isCombatMode = gameMode === 'survival' || gameMode === 'hardcore' || gameMode === 'adventure';
+    const isNight = timeOfDay < 0.25 || timeOfDay > 0.75;
     const isUnderground = playerPos.y < 26;
 
-    // 1. Spawn Hostiles (Night time or in caves/underground)
-    if ((isNight || isUnderground) && hostileCount < maxHostiles) {
+    const maxHostiles = !isCombatMode
+      ? 0
+      : isNight || isUnderground
+      ? gameMode === 'hardcore'
+        ? 16
+        : 11
+      : gameMode === 'hardcore'
+      ? 5
+      : 3;
+    const maxPeacefuls = 6;
+
+    // 1. Spawn Hostiles (Full waves at night/caves, plus daytime Creepers/Spiders in combat modes)
+    if (isCombatMode && hostileCount < maxHostiles) {
       const angle = Math.random() * Math.PI * 2;
-      const dist = 18 + Math.random() * 18;
+      const dist = 16 + Math.random() * 16;
       const sx = Math.floor(playerPos.x + Math.sin(angle) * dist);
       const sz = Math.floor(playerPos.z + Math.cos(angle) * dist);
 
@@ -1252,20 +1611,25 @@ export class EntityManager {
       const isSolidGround =
         groundBlock !== BlockType.AIR &&
         groundBlock !== BlockType.WATER &&
-        groundBlock !== BlockType.LAVA;
+        groundBlock !== BlockType.LAVA &&
+        (isUnderground || sy > 24);
       const hasClearance =
         (headSpace1 === BlockType.AIR || headSpace1 === BlockType.POPPY || headSpace1 === BlockType.DANDELION) &&
         headSpace2 === BlockType.AIR;
 
       if (isSolidGround && hasClearance) {
-        const hostilePool: ('zombie' | 'skeleton' | 'creeper' | 'spider')[] = [
+        const nightPool: ('zombie' | 'skeleton' | 'creeper' | 'spider' | 'enderman')[] = [
           'zombie',
           'zombie',
           'skeleton',
+          'skeleton',
           'creeper',
           'spider',
+          'enderman',
         ];
-        const chosen = hostilePool[Math.floor(Math.random() * hostilePool.length)];
+        const dayPool: ('creeper' | 'spider')[] = ['creeper', 'spider'];
+        const pool = isNight || isUnderground ? nightPool : dayPool;
+        const chosen = pool[Math.floor(Math.random() * pool.length)];
         this.spawnMob(chosen, sx + 0.5, sy + 1, sz + 0.5);
         this.spawnParticleBurst(sx + 0.5, sy + 1.2, sz + 0.5, '#4a044e', 8);
       }
@@ -1294,15 +1658,9 @@ export class EntityManager {
   }
 
   public dispose() {
-    this.mobs.forEach((mob) => this.scene.remove(mob.group));
-    this.mobs = [];
+    this.clearMobs();
     this.droppedItems.forEach((drop) => this.scene.remove(drop.mesh));
     this.droppedItems = [];
-    this.arrows.forEach((arr) => {
-      this.scene.remove(arr.mesh);
-      arr.mesh.geometry.dispose();
-    });
-    this.arrows = [];
     if (this.particlePoints) {
       this.scene.remove(this.particlePoints);
       this.particlePoints.geometry.dispose();
